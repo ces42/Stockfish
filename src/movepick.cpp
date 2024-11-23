@@ -72,6 +72,14 @@ void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
         }
 }
 
+ExtMove* remove(ExtMove* begin, ExtMove* end, Move del) {
+    ExtMove* p = std::find(begin, end, del);
+    if (p == end)
+        return end;
+    std::copy(p+1, end, p);
+    return end - 1;
+}
+
 }  // namespace
 
 
@@ -207,7 +215,7 @@ Move MovePicker::select(Pred filter) {
         if constexpr (T == Best)
             std::swap(*cur, *std::max_element(cur, endMoves));
 
-        if (*cur != ttMove && filter())
+        if (filter())
             return *cur++;
 
         cur++;
@@ -238,6 +246,8 @@ top:
     case QCAPTURE_INIT :
         cur = endBadCaptures = moves;
         endMoves             = generate<CAPTURES>(pos, cur);
+        if (ttMove)
+            endMoves = remove(cur, endMoves, ttMove);
 
         score<CAPTURES>();
         partial_insertion_sort(cur, endMoves, std::numeric_limits<int>::min());
@@ -259,7 +269,10 @@ top:
         if (!skipQuiets)
         {
             cur      = endBadCaptures;
-            endMoves = beginBadQuiets = endBadQuiets = generate<QUIETS>(pos, cur);
+            endMoves = generate<QUIETS>(pos, cur);
+            if (ttMove)
+                endMoves = remove(cur, endMoves, ttMove);
+            beginBadQuiets = endBadQuiets = endMoves;
 
             score<QUIETS>();
             partial_insertion_sort(cur, endMoves, quiet_threshold(depth));
@@ -305,6 +318,8 @@ top:
     case EVASION_INIT :
         cur      = moves;
         endMoves = generate<EVASIONS>(pos, cur);
+        if (ttMove)
+            endMoves = remove(cur, endMoves, ttMove);
 
         score<EVASIONS>();
         ++stage;
