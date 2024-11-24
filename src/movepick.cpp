@@ -76,7 +76,7 @@ ExtMove* remove(ExtMove* begin, ExtMove* end, Move del) {
     ExtMove* p = std::find(begin, end, del);
     if (p == end)
         return end;
-    std::copy(p+1, end, p);
+    *p = *(end - 1);
     return end - 1;
 }
 
@@ -318,7 +318,7 @@ top:
     case EVASION_INIT :
         cur      = moves;
         endMoves = generate<EVASIONS>(pos, cur);
-        if (ttMove)
+        if (ttMove) // deleting the ttMove here slightly affects move order
             endMoves = remove(cur, endMoves, ttMove);
 
         score<EVASIONS>();
