@@ -49,7 +49,9 @@ struct ExtMove: public Move {
 inline bool operator<(const ExtMove& f, const ExtMove& s) { return f.value < s.value; }
 
 template<GenType>
-ExtMove* generate(const Position& pos, ExtMove* moveList);
+ExtMove* generate(const Position& pos,
+                  ExtMove* moveList,
+                  Move exclude = Move::none());
 
 // The MoveList struct wraps the generate() function and returns a convenient
 // list of moves. Using MoveList is sometimes preferable to directly calling
