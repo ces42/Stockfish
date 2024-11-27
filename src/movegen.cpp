@@ -38,9 +38,9 @@ void make_promotions(Action append, [[maybe_unused]] Square to) {
 
     if constexpr ((Type == CAPTURES && Enemy) || (Type == QUIETS && !Enemy) || all)
     {
-        append(Move::make<PROMOTION>(to - D, to, ROOK));
-        append(Move::make<PROMOTION>(to - D, to, BISHOP));
-        append(Move::make<PROMOTION>(to - D, to, KNIGHT));
+        append(Move::make<PROMOTION>(to - D, to, ROOK), -60'000);
+        append(Move::make<PROMOTION>(to - D, to, BISHOP), -65'000);
+        append(Move::make<PROMOTION>(to - D, to, KNIGHT), -45'000);
     }
 }
 
@@ -216,7 +216,10 @@ ExtMove* generate(const Position& pos,
 
     if (exclude == Move::none())
     {
-        auto append = [&moveList](Move mov) { *moveList++ = mov; };
+		auto append = [&moveList](Move mov, int score = 0) {
+			*moveList = mov;
+			(moveList++)->value = score;
+		};
         if (us == WHITE)
             generate_all<WHITE, Type>(pos, append);
         else
@@ -225,9 +228,12 @@ ExtMove* generate(const Position& pos,
         return moveList;
     }
 
-    auto append = [&moveList, &exclude](Move mov) {
+    auto append = [&moveList, &exclude](Move mov, int score = 0) {
         if (mov != exclude)
-            *moveList++ = mov;
+		{
+			*moveList = mov;
+			(moveList++)->value = score;
+		}
     };
 
     if (us == WHITE)
