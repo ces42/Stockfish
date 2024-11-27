@@ -40,6 +40,7 @@ enum Stages {
     GOOD_QUIET,
     BAD_CAPTURE,
     BAD_QUIET,
+    DONE,
 
     // generate evasion moves
     EVASION_TT,
@@ -71,6 +72,49 @@ void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
             *q = tmp;
         }
 }
+
+ExtMove* split(ExtMove* begin, ExtMove* end, ExtMove* largeEnd, int cutoff) {
+    ExtMove* left = largeEnd;
+    ExtMove* right = begin;
+    for (ExtMove *p = begin; p < end; ++p) {
+        // invariant: right <= p
+        if (p->value >= cutoff) {
+            *(--left) = *p;
+        } else {
+            *(right++) = *p;
+        }
+    }
+    return left;
+}
+
+// ExtMove* split_and_sort(ExtMove* begin, ExtMove* end, ExtMove* largeEnd, int cutoff, int limit) {
+//
+//     ExtMove *largeBegin = largeEnd;
+//     ExtMove *smallEnd = begin;
+//     // ExtMove *sortedEndLarge = targetLarge;
+//     ExtMove *sortedEndSmall = begin - 1;
+//     for (ExtMove *p = begin; p < end; ++p)
+//         if (p->value >= cutoff)
+//         {
+//             ExtMove *q = largeBegin--;
+//             for(; q != largeEnd - 1 && *p < *(q+1); ++q)
+//             {
+//                 *q = *(q+1);
+//             }
+//             *q = *p;
+//         } else {
+//             if (p->value >= limit)
+//             {
+//                 ExtMove tmp = *p, *q;
+//                 *(smallEnd++) = *(++sortedEndSmall);
+//                 for (q = sortedEndSmall; q != begin && *(q - 1) < tmp; --q)
+//                     *q = *(q - 1);
+//                 *q = tmp;
+//             } else {
+//                 *(smallEnd++) = *p;
+//             }
+//         }
+// }
 
 }  // namespace
 
@@ -220,6 +264,7 @@ Move MovePicker::select(Pred filter) {
 // picking the move with the highest score from a list of generated moves.
 Move MovePicker::next_move() {
 
+    int BAD_CUTOFF = -7998;
     auto quiet_threshold = [](Depth d) { return -3560 * d; };
 
 top:
@@ -258,48 +303,49 @@ top:
     case QUIET_INIT :
         if (!skipQuiets)
         {
+            int nr_badcap = endBadCaptures - moves;
             cur      = endBadCaptures;
-            endMoves = beginBadQuiets = endBadQuiets = generate<QUIETS>(pos, cur);
+            endMoves = generate<QUIETS>(pos, cur);
+            int nr_quiets = endMoves - cur;
 
             score<QUIETS>();
-            partial_insertion_sort(cur, endMoves, quiet_threshold(depth));
+
+            // cur = split(cur, endMoves, moves, BAD_CUTOFF);
+            // endMoves -= (moves - cur);
+            cur = moves;
+            assert (endMoves - cur == nr_badcap + nr_quiets);
+
+            // for (ExtMove *p = cur; p < moves; ++p)
+            //     assert (p->value >= BAD_CUTOFF);
+            // for (ExtMove *p = endBadCaptures; p < endMoves; ++p)
+            //     assert (p->value < BAD_CUTOFF);
+
+            // partial_insertion_sort(cur, moves, quiet_threshold(depth));
+            // if (quiet_threshold(depth) < BAD_CUTOFF)
+                partial_insertion_sort(endBadCaptures, endMoves, quiet_threshold(depth));
+
+            stage = GOOD_QUIET;
+        } else {
+            cur = moves;
+            endMoves = endBadCaptures;
+            stage = BAD_CAPTURE;
         }
 
-        ++stage;
         [[fallthrough]];
 
     case GOOD_QUIET :
-        if (!skipQuiets && select<Next>([]() { return true; }))
+    case BAD_CAPTURE :
+    case BAD_QUIET :
+        [[likely]];
         {
-            if ((cur - 1)->value > -7998 || (cur - 1)->value <= quiet_threshold(depth))
-                return *(cur - 1);
-
-            // Remaining quiets are bad
-            beginBadQuiets = cur - 1;
+            auto ret = select<Next>([]() { return true; });
+            assert (ret == Move::none() || ret == *(cur-1));
+            assert(ret == Move::none() || ret.is_ok());
+            assert (ret == Move::none() || pos.pseudo_legal(ret));
+            return ret;
         }
 
-        // Prepare the pointers to loop over the bad captures
-        cur      = moves;
-        endMoves = endBadCaptures;
-
-        ++stage;
-        [[fallthrough]];
-
-    case BAD_CAPTURE :
-        if (select<Next>([]() { return true; }))
-            return *(cur - 1);
-
-        // Prepare the pointers to loop over the bad quiets
-        cur      = beginBadQuiets;
-        endMoves = endBadQuiets;
-
-        ++stage;
-        [[fallthrough]];
-
-    case BAD_QUIET :
-        if (!skipQuiets)
-            return select<Next>([]() { return true; });
-
+    case DONE :
         return Move::none();
 
     case EVASION_INIT :
@@ -324,6 +370,15 @@ top:
     return Move::none();  // Silence warning
 }
 
-void MovePicker::skip_quiet_moves() { skipQuiets = true; }
+void MovePicker::skip_quiet_moves() {
+    skipQuiets = true;
+    endMoves = endBadCaptures;
+    if (cur < moves) { // GOOD_QUIET
+        cur = moves;
+    } else if (stage == GOOD_QUIET && cur >= endBadCaptures) {
+        // BAD_QUIET
+        stage = DONE;
+    }
+}
 
 }  // namespace Stockfish

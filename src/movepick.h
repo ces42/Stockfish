@@ -77,7 +77,8 @@ class MovePicker {
     Depth                        depth;
     int                          ply;
     bool                         skipQuiets = false;
-    ExtMove                      moves[MAX_MOVES];
+    ExtMove                      buffer[MAX_MOVES * 2];
+    ExtMove*                     moves = buffer + MAX_MOVES;
 };
 
 }  // namespace Stockfish
