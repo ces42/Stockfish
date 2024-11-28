@@ -36,7 +36,7 @@ enum Stages {
     MAIN_TT,
     CAPTURE_INIT,
     GOOD_CAPTURE,
-    QUIET_INIT,
+    // QUIET_INIT,
     QUIET_OR_BAD_CAPTURE,
     // GOOD_QUIET,
     // BAD_CAPTURE,
@@ -269,40 +269,23 @@ top:
             }))
             return *(cur - 1);
 
-    //     ++stage;
-    //     [[fallthrough]];
-    //
-    // case QUIET_INIT :
         if (!skipQuiets)
         {
-            int nr_badcap = endBadCaptures - moves;
             cur      = endBadCaptures;
             endMoves = generate<QUIETS>(pos, cur);
-            // for (ExtMove* p = cur; p < endMoves; ++p)
-            //     assert (pos.pseudo_legal(*p));
 
-            int nr_quiets = endMoves - cur;
             score<QUIETS>();
 
             cur = split(cur, endMoves, moves, BAD_CUTOFF);
             endMoves -= (moves - cur);
 
-            assert (endMoves - cur == nr_badcap + nr_quiets);
-
-            // for (ExtMove *p = cur; p < moves; ++p)
-            //     assert (p->value >= BAD_CUTOFF);
-            // for (ExtMove *p = endBadCaptures; p < endMoves; ++p)
-            //     assert (p->value < BAD_CUTOFF);
-
             if (quiet_threshold(depth) < BAD_CUTOFF)
             {
-                std::cout << "low threshold\n";
                 partial_insertion_sort(cur, moves, std::numeric_limits<int>::min());
                 partial_insertion_sort(endBadCaptures, endMoves, quiet_threshold(depth));
             }
             else
             {
-                std::cout << "high threshold\n";
                 partial_insertion_sort(cur, moves, quiet_threshold(depth));
             }
 
@@ -316,18 +299,16 @@ top:
 
     // case GOOD_QUIET :
     // case BAD_CAPTURE :
+    // case BAD_QUIET :
     case QUIET_OR_BAD_CAPTURE :
     case EVASION :
     case QCAPTURE :
-    // case BAD_QUIET :
         [[likely]];
         return select<Next>([]() { return true; });
 
     case EVASION_INIT :
         cur      = moves;
         endMoves = generate<EVASIONS>(pos, cur);
-        // for (ExtMove* p = cur; p < endMoves; ++p)
-        //     assert (pos.pseudo_legal(*p));
 
         score<EVASIONS>();
         partial_insertion_sort(cur, endMoves, std::numeric_limits<int>::min());
