@@ -37,9 +37,10 @@ enum Stages {
     CAPTURE_INIT,
     GOOD_CAPTURE,
     QUIET_INIT,
-    GOOD_QUIET,
-    BAD_CAPTURE,
-    BAD_QUIET,
+    QUIET_OR_BAD_CAPTURE,
+    // GOOD_QUIET,
+    // BAD_CAPTURE,
+    // BAD_QUIET,
     DONE,
 
     // generate evasion moves
@@ -87,34 +88,6 @@ ExtMove* split(ExtMove* begin, ExtMove* end, ExtMove* largeEnd, int cutoff) {
     return left;
 }
 
-// ExtMove* split_and_sort(ExtMove* begin, ExtMove* end, ExtMove* largeEnd, int cutoff, int limit) {
-//
-//     ExtMove *largeBegin = largeEnd;
-//     ExtMove *smallEnd = begin;
-//     // ExtMove *sortedEndLarge = targetLarge;
-//     ExtMove *sortedEndSmall = begin - 1;
-//     for (ExtMove *p = begin; p < end; ++p)
-//         if (p->value >= cutoff)
-//         {
-//             ExtMove *q = largeBegin--;
-//             for(; q != largeEnd - 1 && *p < *(q+1); ++q)
-//             {
-//                 *q = *(q+1);
-//             }
-//             *q = *p;
-//         } else {
-//             if (p->value >= limit)
-//             {
-//                 ExtMove tmp = *p, *q;
-//                 *(smallEnd++) = *(++sortedEndSmall);
-//                 for (q = sortedEndSmall; q != begin && *(q - 1) < tmp; --q)
-//                     *q = *(q - 1);
-//                 *q = tmp;
-//             } else {
-//                 *(smallEnd++) = *p;
-//             }
-//         }
-// }
 
 }  // namespace
 
@@ -264,7 +237,7 @@ Move MovePicker::select(Pred filter) {
 // picking the move with the highest score from a list of generated moves.
 Move MovePicker::next_move() {
 
-    int BAD_CUTOFF = -7998;
+    constexpr int BAD_CUTOFF = -7998;
     auto quiet_threshold = [](Depth d) { return -3560 * d; };
 
 top:
@@ -297,22 +270,24 @@ top:
             }))
             return *(cur - 1);
 
-        ++stage;
-        [[fallthrough]];
-
-    case QUIET_INIT :
+    //     ++stage;
+    //     [[fallthrough]];
+    //
+    // case QUIET_INIT :
         if (!skipQuiets)
         {
             int nr_badcap = endBadCaptures - moves;
             cur      = endBadCaptures;
             endMoves = generate<QUIETS>(pos, cur);
-            int nr_quiets = endMoves - cur;
+            // for (ExtMove* p = cur; p < endMoves; ++p)
+            //     assert (pos.pseudo_legal(*p));
 
+            int nr_quiets = endMoves - cur;
             score<QUIETS>();
 
-            // cur = split(cur, endMoves, moves, BAD_CUTOFF);
-            // endMoves -= (moves - cur);
-            cur = moves;
+            cur = split(cur, endMoves, moves, BAD_CUTOFF);
+            endMoves -= (moves - cur);
+
             assert (endMoves - cur == nr_badcap + nr_quiets);
 
             // for (ExtMove *p = cur; p < moves; ++p)
@@ -320,30 +295,26 @@ top:
             // for (ExtMove *p = endBadCaptures; p < endMoves; ++p)
             //     assert (p->value < BAD_CUTOFF);
 
-            // partial_insertion_sort(cur, moves, quiet_threshold(depth));
-            // if (quiet_threshold(depth) < BAD_CUTOFF)
+            partial_insertion_sort(cur, moves, quiet_threshold(depth));
+            if (quiet_threshold(depth) < BAD_CUTOFF)
                 partial_insertion_sort(endBadCaptures, endMoves, quiet_threshold(depth));
 
-            stage = GOOD_QUIET;
         } else {
             cur = moves;
             endMoves = endBadCaptures;
-            stage = BAD_CAPTURE;
         }
+        stage = QUIET_OR_BAD_CAPTURE;
 
         [[fallthrough]];
 
-    case GOOD_QUIET :
-    case BAD_CAPTURE :
-    case BAD_QUIET :
+    // case GOOD_QUIET :
+    // case BAD_CAPTURE :
+    case QUIET_OR_BAD_CAPTURE :
+    case EVASION :
+    case QCAPTURE :
+    // case BAD_QUIET :
         [[likely]];
-        {
-            auto ret = select<Next>([]() { return true; });
-            assert (ret == Move::none() || ret == *(cur-1));
-            assert(ret == Move::none() || ret.is_ok());
-            assert (ret == Move::none() || pos.pseudo_legal(ret));
-            return ret;
-        }
+        return select<Next>([]() { return true; });
 
     case DONE :
         return Move::none();
@@ -351,19 +322,16 @@ top:
     case EVASION_INIT :
         cur      = moves;
         endMoves = generate<EVASIONS>(pos, cur);
+        // for (ExtMove* p = cur; p < endMoves; ++p)
+        //     assert (pos.pseudo_legal(*p));
 
         score<EVASIONS>();
-        ++stage;
-        [[fallthrough]];
-
-    case EVASION :
-        return select<Best>([]() { return true; });
+        partial_insertion_sort(cur, endMoves, std::numeric_limits<int>::min());
+        stage = EVASION;
+        return select<Next>([]() { return true; });
 
     case PROBCUT :
         return select<Next>([&]() { return pos.see_ge(*cur, threshold); });
-
-    case QCAPTURE :
-        return select<Next>([]() { return true; });
     }
 
     assert(false);
@@ -372,12 +340,13 @@ top:
 
 void MovePicker::skip_quiet_moves() {
     skipQuiets = true;
-    endMoves = endBadCaptures;
-    if (cur < moves) { // GOOD_QUIET
-        cur = moves;
-    } else if (stage == GOOD_QUIET && cur >= endBadCaptures) {
-        // BAD_QUIET
-        stage = DONE;
+    if (stage == QUIET_OR_BAD_CAPTURE) {
+        endMoves = endBadCaptures;
+        if (cur < moves) { // GOOD_QUIET
+            cur = moves;
+        } else if (cur >= endBadCaptures) { // BAD_QUIET
+            stage = DONE;
+        }
     }
 }
 
