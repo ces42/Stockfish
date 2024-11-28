@@ -77,7 +77,7 @@ ExtMove* split(ExtMove* begin, ExtMove* end, ExtMove* largeEnd, int cutoff) {
     ExtMove* left = largeEnd;
     ExtMove* right = begin;
     for (ExtMove *p = begin; p < end; ++p) {
-        // invariant: right <= p
+        // invariant: *right <= *p
         if (p->value >= cutoff) {
             *(--left) = *p;
         } else {
@@ -86,6 +86,48 @@ ExtMove* split(ExtMove* begin, ExtMove* end, ExtMove* largeEnd, int cutoff) {
     }
     return left;
 }
+
+ExtMove* split_and_sort(ExtMove* begin, ExtMove* end, ExtMove* largeEnd, int cutoff, int limit) {
+    assert(limit < cutoff);
+    ExtMove* left = largeEnd;
+    ExtMove* right = begin;
+    ExtMove* sortedEnd = begin - 1;
+    for (ExtMove *p = begin; p < end; ++p) {
+        if (p->value >= cutoff) {
+            ExtMove *q;
+            for (q = left--; q != largeEnd && *p < *q; ++q)
+                *(q-1) = *q;
+            *(q-1) = *p;
+            // assert (q-1 < largeEnd);
+            // for (q = left; q < largeEnd - 1; ++q)
+            // {
+            //     assert (*q != Move::null());
+            //     assert (!(*q < *(q+1)));
+            // }
+        } else {
+            ExtMove tmp = *p;
+            if (tmp.value >= limit)
+            {
+                ExtMove *q;
+                *(right++) = *++sortedEnd;
+                for (q = sortedEnd; q != begin && *(q - 1) < tmp; --q)
+                    *q = *(q - 1);
+                *q = tmp;
+            } else {
+                *(right++) = tmp;
+            }
+            // for (ExtMove *q = begin; q < right - 1; ++q)
+            // {
+            //     assert (*q != Move::null());
+            //     assert (q->value < limit || !(*q < *(q+1)));
+            // }
+        }
+    }
+    return left;
+}
+
+
+
 
 
 }  // namespace
@@ -271,23 +313,29 @@ top:
 
         if (!skipQuiets)
         {
+            // int nr_badcap = endBadCaptures - moves;
             cur      = endBadCaptures;
             endMoves = generate<QUIETS>(pos, cur);
 
+            // int nr_quiets = endMoves - cur;
             score<QUIETS>();
 
-            cur = split(cur, endMoves, moves, BAD_CUTOFF);
-            endMoves -= (moves - cur);
 
             if (quiet_threshold(depth) < BAD_CUTOFF)
             {
-                partial_insertion_sort(cur, moves, std::numeric_limits<int>::min());
-                partial_insertion_sort(endBadCaptures, endMoves, quiet_threshold(depth));
+                cur = split_and_sort(cur, endMoves, moves, BAD_CUTOFF, quiet_threshold(depth));
+                // this is (almost) equivalent to 
+                // cur = split(cur, endMoves, moves, BAD_CUTOFF);
+                // partial_insertion_sort(cur, moves, std::numeric_limits<int>::min());
+                // partial_insertion_sort(endBadCaptures, endMoves, quiet_threshold(depth));
             }
             else
             {
+                cur = split(cur, endMoves, moves, BAD_CUTOFF);
                 partial_insertion_sort(cur, moves, quiet_threshold(depth));
             }
+            endMoves -= (moves - cur);
+            // assert (endMoves - cur == nr_badcap + nr_quiets);
 
         } else {
             cur = moves;
