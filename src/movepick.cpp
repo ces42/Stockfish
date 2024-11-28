@@ -41,7 +41,6 @@ enum Stages {
     // GOOD_QUIET,
     // BAD_CAPTURE,
     // BAD_QUIET,
-    DONE,
 
     // generate evasion moves
     EVASION_TT,
@@ -238,7 +237,7 @@ Move MovePicker::select(Pred filter) {
 Move MovePicker::next_move() {
 
     constexpr int BAD_CUTOFF = -7998;
-    auto quiet_threshold = [](Depth d) { return -3560 * d; };
+    constexpr auto quiet_threshold = [](Depth d) { return -3560 * d; };
 
 top:
     switch (stage)
@@ -295,9 +294,17 @@ top:
             // for (ExtMove *p = endBadCaptures; p < endMoves; ++p)
             //     assert (p->value < BAD_CUTOFF);
 
-            partial_insertion_sort(cur, moves, quiet_threshold(depth));
             if (quiet_threshold(depth) < BAD_CUTOFF)
+            {
+                std::cout << "low threshold\n";
+                partial_insertion_sort(cur, moves, std::numeric_limits<int>::min());
                 partial_insertion_sort(endBadCaptures, endMoves, quiet_threshold(depth));
+            }
+            else
+            {
+                std::cout << "high threshold\n";
+                partial_insertion_sort(cur, moves, quiet_threshold(depth));
+            }
 
         } else {
             cur = moves;
@@ -315,9 +322,6 @@ top:
     // case BAD_QUIET :
         [[likely]];
         return select<Next>([]() { return true; });
-
-    case DONE :
-        return Move::none();
 
     case EVASION_INIT :
         cur      = moves;
@@ -342,11 +346,12 @@ void MovePicker::skip_quiet_moves() {
     skipQuiets = true;
     if (stage == QUIET_OR_BAD_CAPTURE) {
         endMoves = endBadCaptures;
-        if (cur < moves) { // GOOD_QUIET
+        if (cur < moves) // GOOD_QUIET
             cur = moves;
-        } else if (cur >= endBadCaptures) { // BAD_QUIET
-            stage = DONE;
-        }
+        // we don't need to explicitly go to the DONE stage, because select()
+        // will automatically return Move::none()
+        // else if (cur >= endBadCaptures) // BAD_QUIET
+        //     stage = DONE;
     }
 }
 
