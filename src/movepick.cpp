@@ -180,6 +180,7 @@ void MovePicker::score() {
             m.value -= (pt == QUEEN ? bool(to & threatenedByRook) * 49000
                         : pt == ROOK && bool(to & threatenedByMinor) ? 24335
                                                                      : 0);
+            m.value -= (m.type_of() == PROMOTION) * 65000;
 
             if (ply < LOW_PLY_HISTORY_SIZE)
                 m.value += 8 * (*lowPlyHistory)[ply][m.from_to()] / (1 + 2 * ply);
