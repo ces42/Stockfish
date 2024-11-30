@@ -19,6 +19,7 @@
 #include "movepick.h"
 
 #include <algorithm>
+#include <execution>
 #include <array>
 #include <cassert>
 #include <limits>
@@ -27,7 +28,12 @@
 #include "bitboard.h"
 #include "position.h"
 
+#include "tune.h"
 namespace Stockfish {
+
+int BAD_CUTOFF = -7998;
+int QUIET_TH_SLOPE = 3560;
+TUNE(BAD_CUTOFF, QUIET_TH_SLOPE);
 
 namespace {
 
@@ -57,6 +63,10 @@ enum Stages {
     QCAPTURE_INIT,
     QCAPTURE
 };
+
+void partial_insertion_sort(ExtMove*, ExtMove*, int) /*__attribute__((noinline))*/;
+ExtMove* split(ExtMove*, ExtMove*, ExtMove*, int) /*__attribute__((noinline))*/;
+ExtMove* split_and_sort(ExtMove*, ExtMove*, ExtMove*, int, int) /*__attribute__((noinline))*/;
 
 // Sort moves in descending order up to and including a given limit.
 // The order of moves smaller than the limit is left unspecified.
@@ -278,8 +288,8 @@ Move MovePicker::select(Pred filter) {
 // picking the move with the highest score from a list of generated moves.
 Move MovePicker::next_move() {
 
-    constexpr int BAD_CUTOFF = -7998;
-    constexpr auto quiet_threshold = [](Depth d) { return -3560 * d; };
+    // constexpr int BAD_CUTOFF = -7998;
+    constexpr auto quiet_threshold = [](Depth d) { return -QUIET_TH_SLOPE * d; };
 
 top:
     switch (stage)
