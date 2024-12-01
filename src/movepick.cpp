@@ -19,7 +19,6 @@
 #include "movepick.h"
 
 #include <algorithm>
-#include <execution>
 #include <array>
 #include <cassert>
 #include <limits>
@@ -28,12 +27,14 @@
 #include "bitboard.h"
 #include "position.h"
 
-#include "tune.h"
+// #include "tune.h"
 namespace Stockfish {
 
-int BAD_CUTOFF = -7998;
-int QUIET_TH_SLOPE = 3560;
-TUNE(BAD_CUTOFF, QUIET_TH_SLOPE);
+// int BAD_CUTOFF = -7998;
+int BAD_CUTOFF = -8345;
+// int QUIET_TH_SLOPE = 3560;
+int QUIET_TH_SLOPE = 3563;
+// TUNE(BAD_CUTOFF, QUIET_TH_SLOPE);
 
 namespace {
 
