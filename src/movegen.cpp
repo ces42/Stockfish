@@ -142,8 +142,8 @@ void generate_pawn_moves(const Position& pos, Bitboard target, Action append) {
     }
 }
 
-int MOBILITY_BONUS[4] = {11, 12,  9, 5 }; // values are essentially taken from the old hand-crafted evaluation
-int AVG_MOB_BONUS[4] =  {46, 45, 58, 48};
+int MOBILITY_BONUS[4] = {546, 297, 324, 132}; // values are essentially taken from the old hand-crafted evaluation
+int AVG_MOB_BONUS[4] =  {2311, 1113, 1459, 1201};
 
 template<Color Us, PieceType Pt, GenType Type, typename Action>
 void generate_moves(const Position& pos, Bitboard target, Action append) {
@@ -164,11 +164,7 @@ void generate_moves(const Position& pos, Bitboard target, Action append) {
 
 		int score = 0;
 		if constexpr (Type == QUIETS && Pt >= 2 && Pt <= 5)
-		{
-			score = AVG_MOB_BONUS[Pt -2] - MOBILITY_BONUS[Pt - 2] * moves;
-			if constexpr (Pt != KNIGHT)
-				score = score / 2;
-		}
+            score = AVG_MOB_BONUS[Pt -2] - MOBILITY_BONUS[Pt - 2] * moves;
 
         while (b)
             append(Move(from, pop_lsb(b)), score);
