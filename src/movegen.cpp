@@ -38,9 +38,9 @@ void make_promotions(Action append, [[maybe_unused]] Square to) {
 
     if constexpr ((Type == CAPTURES && Enemy) || (Type == QUIETS && !Enemy) || all)
     {
-        append(Move::make<PROMOTION>(to - D, to, ROOK));
-        append(Move::make<PROMOTION>(to - D, to, BISHOP));
-        append(Move::make<PROMOTION>(to - D, to, KNIGHT));
+        append(Move::make<PROMOTION>(to - D, to, ROOK), -10000 + RookValue - QueenValue);
+        append(Move::make<PROMOTION>(to - D, to, BISHOP), -10000 + BishopValue - QueenValue);
+        append(Move::make<PROMOTION>(to - D, to, KNIGHT), -5000 + KnightValue - QueenValue);
     }
 }
 
@@ -142,8 +142,19 @@ void generate_pawn_moves(const Position& pos, Bitboard target, Action append) {
     }
 }
 
+// float avg_moves[4] = {}; // Knight, Bishop, Rook, Queen
+// int moves_samples[4] = {};
 
-template<Color Us, PieceType Pt, typename Action>
+/*float avg_defends[4] = {}; // Knight, Bishop, Rook, Queen*/
+/*int defends_samples[4] = {};*/
+// std::string NAMES[4] = {"Knight", "Bishop", "Rook", "Queen"};
+
+// float MOBILITY_BONUS[4] =   {10.93, 11.90, 9.38, 5.28};
+// float AVERAGE_MOBILITY[4] = { 4.23,  3.74,  6.22,  9.10};
+int MOBILITY_BONUS[4] = {11, 12,  9, 5 }; // values are essentially taken from the old hand-crafted evaluation
+int AVG_MOB_BONUS[4] =  {46, 45, 58, 48};
+
+template<Color Us, PieceType Pt, GenType Type, typename Action>
 void generate_moves(const Position& pos, Bitboard target, Action append) {
 
     static_assert(Pt != KING && Pt != PAWN, "Unsupported piece type in generate_moves()");
@@ -153,10 +164,39 @@ void generate_moves(const Position& pos, Bitboard target, Action append) {
     while (bb)
     {
         Square   from = pop_lsb(bb);
-        Bitboard b    = attacks_bb<Pt>(from, pos.pieces()) & target;
+        Bitboard b    = attacks_bb<Pt>(from, pos.pieces());
+		/*int moves_defends = popcount(b);*/
+		[[maybe_unused]] int moves;
+		if constexpr (Type == QUIETS && Pt >= 2 && Pt <= 5)
+			moves = popcount(b);
+		b &= target;
+
+		int score = 0;
+		if constexpr (Type == QUIETS && Pt >= 2 && Pt <= 5)
+		{
+			// avg_moves[Pt - 2] = (moves + moves_samples[Pt - 2] * avg_moves[Pt - 2]) / (moves_samples[Pt - 2] + 1);
+			// moves_samples[Pt - 2]++;
+			// if (! (moves_samples[Pt - 2] % 5000))
+			// 	std::cout << "avg " << NAMES[Pt - 2] << " mob: " << avg_moves[Pt - 2] << std::endl;
+
+			/*
+			int num_defending = moves_defends - moves;
+			avg_defends[Pt - 2] = (num_defending + defends_samples[Pt - 2] * avg_defends[Pt - 2]) / (defends_samples[Pt - 2] + 1);
+			defends_samples[Pt - 2]++;
+			if (! (defends_samples[Pt - 2] % 5000))
+				std::cout << "avg " << NAMES[Pt - 2] << " defends: " << avg_defends[Pt - 2] << std::endl;
+			*/
+
+			/*score -= std::round( MOBILITY_BONUS[Pt - 2] * ( moves - AVERAGE_MOBILITY[Pt -2] ) );*/
+			score = AVG_MOB_BONUS[Pt -2] - MOBILITY_BONUS[Pt - 2] * moves;
+			
+			// 
+			if constexpr (Pt != KNIGHT)
+				score = score / 2;
+		}
 
         while (b)
-            append(Move(from, pop_lsb(b)));
+            append(Move(from, pop_lsb(b)), score);
     }
 }
 
@@ -178,10 +218,10 @@ void generate_all(const Position& pos, Action append) {
                                       : ~pos.pieces();  // QUIETS
 
         generate_pawn_moves<Us, Type>(pos, target, append);
-        generate_moves<Us, KNIGHT>(pos, target, append);
-        generate_moves<Us, BISHOP>(pos, target, append);
-        generate_moves<Us, ROOK>(pos, target, append);
-        generate_moves<Us, QUEEN>(pos, target, append);
+        generate_moves<Us, KNIGHT, Type>(pos, target, append);
+        generate_moves<Us, BISHOP, Type>(pos, target, append);
+        generate_moves<Us, ROOK, Type>(pos, target, append);
+        generate_moves<Us, QUEEN, Type>(pos, target, append);
     }
 
     Bitboard b = attacks_bb<KING>(ksq) & (Type == EVASIONS ? ~pos.pieces(Us) : target);
@@ -212,7 +252,7 @@ ExtMove* generate(const Position& pos, ExtMove* moveList) {
 
     Color us = pos.side_to_move();
 
-    auto append = [&moveList](Move mov) { *moveList++ = mov; };
+    auto append = [&moveList](Move mov, int score = 0) { *moveList++ = { mov, score }; };
     if (us == WHITE)
         generate_all<WHITE, Type>(pos, append);
     else
