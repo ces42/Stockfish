@@ -29,6 +29,7 @@ namespace Stockfish {
 
 namespace {
 
+int INVALID = -123456789;
 enum Stages {
     // generate main search moves
     MAIN_TT,
@@ -198,19 +199,19 @@ void MovePicker::score() {
 // Returns the next move satisfying a predicate function.
 // This never returns the TT move, as it was emitted before.
 template<typename Pred>
-Move MovePicker::select(Pred filter) {
+ExtMove MovePicker::select(Pred filter) {
 
     for (; cur < endMoves; ++cur)
         if (*cur != ttMove && filter())
             return *cur++;
 
-    return Move::none();
+    return {Move::none(), 0};
 }
 
 // This is the most important method of the MovePicker class. We emit one
 // new pseudo-legal move on every call until there are no more moves left,
 // picking the move with the highest score from a list of generated moves.
-Move MovePicker::next_move() {
+ExtMove MovePicker::next_move() {
 
     auto quiet_threshold = [](Depth d) { return -3560 * d; };
 
@@ -223,7 +224,7 @@ top:
     case QSEARCH_TT :
     case PROBCUT_TT :
         ++stage;
-        return ttMove;
+        return {ttMove, INVALID};
 
     case CAPTURE_INIT :
     case PROBCUT_INIT :
@@ -255,6 +256,8 @@ top:
 
             score<QUIETS>();
             partial_insertion_sort(cur, endMoves, quiet_threshold(depth));
+            // if (endMoves > cur + 1)
+            //     std::cout << cur->value - (cur+1)->value << std::endl;
         }
 
         ++stage;
@@ -292,7 +295,7 @@ top:
         if (!skipQuiets)
             return select([]() { return true; });
 
-        return Move::none();
+        return {Move::none(), 0};
 
     case EVASION_INIT :
         cur      = moves;
@@ -312,7 +315,7 @@ top:
     }
 
     assert(false);
-    return Move::none();  // Silence warning
+    return {Move::none(), 0};  // Silence warning
 }
 
 void MovePicker::skip_quiet_moves() { skipQuiets = true; }

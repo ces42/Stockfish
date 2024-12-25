@@ -64,6 +64,13 @@ using namespace Search;
 
 namespace {
 
+int INVALID = -123456789;
+
+void compare_values(int search_value, int score, Depth depth) {
+	if (depth > 5 && score != INVALID)
+		std::cout << search_value << " " << score << "\n";
+}
+
 // Futility margin
 Value futility_margin(Depth d, bool noTtCutNode, bool improving, bool oppWorsening) {
     Value futilityMult       = 109 - 27 * noTtCutNode;
@@ -942,8 +949,10 @@ moves_loop:  // When in check, search starts here
 
     // Step 13. Loop through all pseudo-legal moves until no moves remain
     // or a beta cutoff occurs.
-    while ((move = mp.next_move()) != Move::none())
+	ExtMove extmove;
+    while ((extmove = mp.next_move()) != Move::none())
     {
+		move = extmove; // cast
         assert(move.is_ok());
 
         if (move == excludedMove)
@@ -1097,7 +1106,10 @@ moves_loop:  // When in check, search starts here
                 // singular (multiple moves fail high), and we can prune the whole
                 // subtree by returning a softbound.
                 else if (value >= beta && !is_decisive(value))
-                    return value;
+				{
+					compare_values(value, extmove.value, depth);
+					return value;
+				}
 
                 // Negative extensions
                 // If other moves failed high over (ttValue - margin) without the
@@ -1246,6 +1258,8 @@ moves_loop:  // When in check, search starts here
 
             value = -search<PV>(pos, ss + 1, -beta, -alpha, newDepth, false);
         }
+
+		compare_values(value, extmove.value, depth);
 
         // Step 19. Undo move
         pos.undo_move(move);
