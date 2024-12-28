@@ -223,6 +223,7 @@ top:
     case QSEARCH_TT :
     case PROBCUT_TT :
         ++stage;
+		first_move = false;
         return ttMove;
 
     case CAPTURE_INIT :
@@ -242,7 +243,10 @@ top:
                 return pos.see_ge(*cur, -cur->value / 18) ? true
                                                           : (*endBadCaptures++ = *cur, false);
             }))
-            return *(cur - 1);
+		{
+			first_move = false;
+			return *(cur - 1);
+		}
 
         ++stage;
         [[fallthrough]];
@@ -253,8 +257,14 @@ top:
             cur      = endBadCaptures;
             endMoves = beginBadQuiets = endBadQuiets = generate<QUIETS>(pos, cur);
 
-            score<QUIETS>();
-            partial_insertion_sort(cur, endMoves, quiet_threshold(depth));
+			if (depth > 1 || first_move)
+			{
+				score<QUIETS>();
+				partial_insertion_sort(cur, endMoves, quiet_threshold(depth));
+			} else {
+				for (auto& m : *this)
+					m.value = 0;
+			}
         }
 
         ++stage;
