@@ -58,7 +58,8 @@ void syzygy_extend_pv(const OptionsMap&            options,
                       const Search::LimitsType&    limits,
                       Stockfish::Position&         pos,
                       Stockfish::Search::RootMove& rootMove,
-                      Value&                       v);
+                      Value&                       v,
+                      const TranspositionTable& tt);
 
 using namespace Search;
 
@@ -881,9 +882,7 @@ Value Search::Worker::search(
             movedPiece = pos.moved_piece(move);
             captured   = pos.piece_on(move.to_sq());
 
-            pos.do_move(move, st);
-            // Prefetch the TT entry for the resulting position
-            prefetch(tt.first_entry(pos.key()));
+            pos.do_move(move, st, &tt);
             thisThread->nodes.fetch_add(1, std::memory_order_relaxed);
 
 
@@ -1125,9 +1124,7 @@ moves_loop:  // When in check, search starts here
                 extension = 1;
         }
 
-        pos.do_move(move, st, givesCheck);
-        // Speculative prefetch as early as possible
-        prefetch(tt.first_entry(pos.key()));
+        pos.do_move(move, st, givesCheck, &tt);
         // Add extension to new depth
         newDepth += extension;
 
@@ -1649,9 +1646,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
         }
 
         Piece movedPiece = pos.moved_piece(move);
-        pos.do_move(move, st, givesCheck);
-        // Speculative prefetch as early as possible
-        prefetch(tt.first_entry(pos.key()));
+        pos.do_move(move, st, givesCheck, &tt);
         thisThread->nodes.fetch_add(1, std::memory_order_relaxed);
 
         // Update the current move
@@ -1949,7 +1944,8 @@ void syzygy_extend_pv(const OptionsMap&         options,
                       const Search::LimitsType& limits,
                       Position&                 pos,
                       RootMove&                 rootMove,
-                      Value&                    v) {
+                      Value&                    v,
+                      const TranspositionTable& tt) {
 
     auto t_start      = std::chrono::steady_clock::now();
     int  moveOverhead = int(options["Move Overhead"]);
@@ -1966,7 +1962,7 @@ void syzygy_extend_pv(const OptionsMap&         options,
 
     // Step 0, do the rootMove, no correction allowed, as needed for MultiPV in TB.
     auto& stRoot = sts.emplace_back();
-    pos.do_move(rootMove.pv[0], stRoot);
+    pos.do_move(rootMove.pv[0], stRoot, &tt);
     int ply = 1;
 
     // Step 1, walk the PV to the last position in TB with correct decisive score
@@ -1987,7 +1983,7 @@ void syzygy_extend_pv(const OptionsMap&         options,
         ply++;
 
         auto& st = sts.emplace_back();
-        pos.do_move(pvMove, st);
+        pos.do_move(pvMove, st, &tt);
 
         // Do not allow for repetitions or drawing moves along the PV in TB regime
         if (config.rootInTB && pos.is_draw(ply))
@@ -2019,7 +2015,7 @@ void syzygy_extend_pv(const OptionsMap&         options,
         {
             auto&     rm = legalMoves.emplace_back(m);
             StateInfo tmpSI;
-            pos.do_move(m, tmpSI);
+            pos.do_move(m, tmpSI, &tt);
             // Give a score of each move to break DTZ ties restricting opponent mobility,
             // but not giving the opponent a capture.
             for (const auto& mOpp : MoveList<LEGAL>(pos))
@@ -2049,7 +2045,7 @@ void syzygy_extend_pv(const OptionsMap&         options,
         Move& pvMove = legalMoves[0].pv[0];
         rootMove.pv.push_back(pvMove);
         auto& st = sts.emplace_back();
-        pos.do_move(pvMove, st);
+        pos.do_move(pvMove, st, &tt);
     }
 
     // Finding a draw in this function is an exceptional case, that cannot happen
@@ -2109,7 +2105,7 @@ void SearchManager::pv(Search::Worker&           worker,
         // Potentially correct and extend the PV, and in exceptional cases v
         if (is_decisive(v) && std::abs(v) < VALUE_MATE_IN_MAX_PLY
             && ((!rootMoves[i].scoreLowerbound && !rootMoves[i].scoreUpperbound) || isExact))
-            syzygy_extend_pv(worker.options, worker.limits, pos, rootMoves[i], v);
+            syzygy_extend_pv(worker.options, worker.limits, pos, rootMoves[i], v, tt);
 
         std::string pv;
         for (Move m : rootMoves[i].pv)
@@ -2160,7 +2156,7 @@ bool RootMove::extract_ponder_from_tt(const TranspositionTable& tt, Position& po
     if (pv[0] == Move::none())
         return false;
 
-    pos.do_move(pv[0], st);
+    pos.do_move(pv[0], st, &tt);
 
     auto [ttHit, ttData, ttWriter] = tt.probe(pos.key());
     if (ttHit)
