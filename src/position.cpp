@@ -680,7 +680,7 @@ bool Position::gives_check(Move m) const {
 // Makes a move, and saves all information necessary
 // to a StateInfo object. The move is assumed to be legal. Pseudo-legal
 // moves should be filtered out before this function is called.
-void Position::do_move(Move m, StateInfo& newSt, bool givesCheck, const TranspositionTable* tt) {
+void Position::do_move(Move m, StateInfo& newSt, bool givesCheck, const TranspositionTable* tt = nullptr) {
 
     assert(m.is_ok());
     assert(&newSt != st);

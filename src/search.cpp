@@ -58,8 +58,7 @@ void syzygy_extend_pv(const OptionsMap&            options,
                       const Search::LimitsType&    limits,
                       Stockfish::Position&         pos,
                       Stockfish::Search::RootMove& rootMove,
-                      Value&                       v,
-                      const TranspositionTable& tt);
+                      Value&                       v);
 
 using namespace Search;
 
@@ -1944,8 +1943,7 @@ void syzygy_extend_pv(const OptionsMap&         options,
                       const Search::LimitsType& limits,
                       Position&                 pos,
                       RootMove&                 rootMove,
-                      Value&                    v,
-                      const TranspositionTable& tt) {
+                      Value&                    v) {
 
     auto t_start      = std::chrono::steady_clock::now();
     int  moveOverhead = int(options["Move Overhead"]);
@@ -1962,7 +1960,7 @@ void syzygy_extend_pv(const OptionsMap&         options,
 
     // Step 0, do the rootMove, no correction allowed, as needed for MultiPV in TB.
     auto& stRoot = sts.emplace_back();
-    pos.do_move(rootMove.pv[0], stRoot, &tt);
+    pos.do_move(rootMove.pv[0], stRoot);
     int ply = 1;
 
     // Step 1, walk the PV to the last position in TB with correct decisive score
@@ -1983,7 +1981,7 @@ void syzygy_extend_pv(const OptionsMap&         options,
         ply++;
 
         auto& st = sts.emplace_back();
-        pos.do_move(pvMove, st, &tt);
+        pos.do_move(pvMove, st);
 
         // Do not allow for repetitions or drawing moves along the PV in TB regime
         if (config.rootInTB && pos.is_draw(ply))
@@ -2015,7 +2013,7 @@ void syzygy_extend_pv(const OptionsMap&         options,
         {
             auto&     rm = legalMoves.emplace_back(m);
             StateInfo tmpSI;
-            pos.do_move(m, tmpSI, &tt);
+            pos.do_move(m, tmpSI);
             // Give a score of each move to break DTZ ties restricting opponent mobility,
             // but not giving the opponent a capture.
             for (const auto& mOpp : MoveList<LEGAL>(pos))
@@ -2045,7 +2043,7 @@ void syzygy_extend_pv(const OptionsMap&         options,
         Move& pvMove = legalMoves[0].pv[0];
         rootMove.pv.push_back(pvMove);
         auto& st = sts.emplace_back();
-        pos.do_move(pvMove, st, &tt);
+        pos.do_move(pvMove, st);
     }
 
     // Finding a draw in this function is an exceptional case, that cannot happen
@@ -2105,7 +2103,7 @@ void SearchManager::pv(Search::Worker&           worker,
         // Potentially correct and extend the PV, and in exceptional cases v
         if (is_decisive(v) && std::abs(v) < VALUE_MATE_IN_MAX_PLY
             && ((!rootMoves[i].scoreLowerbound && !rootMoves[i].scoreUpperbound) || isExact))
-            syzygy_extend_pv(worker.options, worker.limits, pos, rootMoves[i], v, tt);
+            syzygy_extend_pv(worker.options, worker.limits, pos, rootMoves[i], v);
 
         std::string pv;
         for (Move m : rootMoves[i].pv)

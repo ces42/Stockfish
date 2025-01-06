@@ -174,7 +174,7 @@ void Engine::set_position(const std::string& fen, const std::vector<std::string>
             break;
 
         states->emplace_back();
-        pos.do_move(m, states->back(), nullptr);
+        pos.do_move(m, states->back());
     }
 }
 

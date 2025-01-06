@@ -367,7 +367,10 @@ inline void Position::move_piece(Square from, Square to) {
     board[to]   = pc;
 }
 
-inline void Position::do_move(Move m, StateInfo& newSt, const TranspositionTable* tt) { do_move(m, newSt, gives_check(m), tt); }
+inline void Position::do_move(Move m, StateInfo& newSt, const TranspositionTable* tt = nullptr)
+{
+    do_move(m, newSt, gives_check(m), tt);
+}
 
 inline StateInfo* Position::state() const { return st; }
 
