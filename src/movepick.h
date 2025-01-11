@@ -21,6 +21,7 @@
 
 #include "history.h"
 #include "movegen.h"
+#include "search.h"
 #include "types.h"
 
 namespace Stockfish {
@@ -51,6 +52,7 @@ class MovePicker {
     Move next_move();
     void skip_quiet_moves();
 
+   friend class Search::Worker;
    private:
     template<typename Pred>
     Move select(Pred);
