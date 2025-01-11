@@ -121,10 +121,13 @@ void MovePicker::setup_score_bbs() {
 
 	Color us = pos.side_to_move();
 
+    const Square ksq = pos.square<KING>(us);
+    const Bitboard kingMask = ~square_bb(ksq);
+
 	threatenedByPawn = pos.attacks_by<PAWN>(~us);
 	threatenedByMinor =
-	  pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatenedByPawn;
-	threatenedByRook = pos.attacks_by<ROOK>(~us) | threatenedByMinor;
+	  pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us, kingMask) | threatenedByPawn;
+	threatenedByRook = pos.attacks_by<ROOK>(~us, kingMask) | threatenedByMinor;
 
 	// Pieces threatened by pieces of lesser material value
 	threatenedPieces = (pos.pieces(us, QUEEN) & threatenedByRook)
