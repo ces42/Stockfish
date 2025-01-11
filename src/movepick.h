@@ -56,6 +56,7 @@ class MovePicker {
     Move select(Pred);
     template<GenType>
     void     score();
+    void setup_score_bbs();
     ExtMove* begin() { return cur; }
     ExtMove* end() { return endMoves; }
 
@@ -73,6 +74,7 @@ class MovePicker {
     int                          ply;
     bool                         skipQuiets = false;
     ExtMove                      moves[MAX_MOVES];
+    Bitboard threatenedByPawn, threatenedByMinor, threatenedByRook, threatenedPieces;
 };
 
 }  // namespace Stockfish
