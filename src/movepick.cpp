@@ -79,7 +79,7 @@ void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
 
 // MovePicker constructor for the main search and for the quiescence search
 MovePicker::MovePicker(const Position&              p,
-                       Move                         ttm,
+                       Move                         ttm[2],
                        Depth                        d,
                        const ButterflyHistory*      mh,
                        const LowPlyHistory*         lph,
@@ -93,28 +93,28 @@ MovePicker::MovePicker(const Position&              p,
     captureHistory(cph),
     continuationHistory(ch),
     pawnHistory(ph),
-    ttMove(ttm),
+    ttMove{ttm[0], ttm[1]},
     depth(d),
     ply(pl) {
 
     if (pos.checkers())
-        stage = EVASION_TT + !(ttm && pos.pseudo_legal(ttm));
+        stage = EVASION_TT + !(ttm[0] && pos.pseudo_legal(ttm[0]));
 
     else
-        stage = (depth > 0 ? MAIN_TT : QSEARCH_TT) + !(ttm && pos.pseudo_legal(ttm));
+        stage = (depth > 0 ? MAIN_TT : QSEARCH_TT) + !(ttm && pos.pseudo_legal(ttm[0]));
 }
 
 // MovePicker constructor for ProbCut: we generate captures with Static Exchange
 // Evaluation (SEE) greater than or equal to the given threshold.
-MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceToHistory* cph) :
+MovePicker::MovePicker(const Position& p, Move ttm[2], int th, const CapturePieceToHistory* cph) :
     pos(p),
     captureHistory(cph),
-    ttMove(ttm),
+    ttMove{ttm[0], ttm[1]},
     threshold(th) {
     assert(!pos.checkers());
 
     stage = PROBCUT_TT
-          + !(ttm && pos.capture_stage(ttm) && pos.pseudo_legal(ttm) && pos.see_ge(ttm, threshold));
+          + !(ttm && pos.capture_stage(ttm[0]) && pos.pseudo_legal(ttm[0]) && pos.see_ge(ttm[0], threshold));
 }
 
 // Assigns a numerical value to each move in a list, used for sorting.
