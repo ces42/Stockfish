@@ -52,7 +52,8 @@ struct TTEntry {
     TTData read() const {
         return TTData{Move(move16),           Value(value16),
                       Value(eval16),          Depth(depth8 + DEPTH_ENTRY_OFFSET),
-                      Bound(genBound8 & 0x3), bool(genBound8 & 0x4)};
+                      Bound(genBound8 & 0x3), bool(genBound8 & 0x4),
+                      Move(move2_16)};
     }
 
     bool is_occupied() const;
@@ -69,6 +70,7 @@ struct TTEntry {
     Move     move16;
     int16_t  value16;
     int16_t  eval16;
+    Move     move2_16;
 };
 
 // `genBound8` is where most of the details are. We use the following constants to manipulate 5 leading generation bits
@@ -94,8 +96,13 @@ void TTEntry::save(
   Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8) {
 
     // Preserve the old ttmove if we don't have a new one
-    if (m || uint16_t(k) != key16)
+    if (uint16_t(k) != key16)
         move16 = m;
+    else if (m) {
+        move2_16 = move16;
+        move16 = m;
+    }
+
 
     // Overwrite less valuable entries (cheapest checks first)
     if (b == BOUND_EXACT || uint16_t(k) != key16 || d - DEPTH_ENTRY_OFFSET + 2 * pv > depth8 - 4
@@ -137,11 +144,12 @@ void TTWriter::write(
 // of TTEntry. Each non-empty TTEntry contains information on exactly one position. The size of a Cluster should
 // divide the size of a cache line for best performance, as the cacheline is prefetched when possible.
 
-static constexpr int ClusterSize = 3;
+// static constexpr int ClusterSize = 3;
+static constexpr int ClusterSize = 1;
 
 struct Cluster {
     TTEntry entry[ClusterSize];
-    char    padding[2];  // Pad to 32 bytes
+    char    padding[32 - ClusterSize * sizeof(TTEntry)];  // Pad to 32 bytes
 };
 
 static_assert(sizeof(Cluster) == 32, "Suboptimal Cluster size");

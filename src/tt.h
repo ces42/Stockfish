@@ -51,6 +51,7 @@ struct TTData {
     Depth depth;
     Bound bound;
     bool  is_pv;
+    Move  move2;
 };
 
 
