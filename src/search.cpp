@@ -874,6 +874,7 @@ Value Search::Worker::search(
 
             // Prefetch the TT entry for the resulting position
             prefetch(tt.first_entry(pos.key_after(move)));
+            prefetch((char*) tt.first_entry(pos.key_after(move)) + 64);
 
             ss->currentMove = move;
             ss->continuationHistory =
@@ -1123,6 +1124,7 @@ moves_loop:  // When in check, search starts here
 
         // Speculative prefetch as early as possible
         prefetch(tt.first_entry(pos.key_after(move)));
+        prefetch((char*) tt.first_entry(pos.key_after(move)) + 64);
 
         // Update the current move (this must be done after singular extension search)
         ss->currentMove = move;
@@ -1639,6 +1641,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
         // Speculative prefetch as early as possible
         prefetch(tt.first_entry(pos.key_after(move)));
+        prefetch((char*) tt.first_entry(pos.key_after(move)) + 64);
 
         // Update the current move
         ss->currentMove = move;
