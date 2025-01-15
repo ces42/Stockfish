@@ -32,6 +32,7 @@ namespace {
 enum Stages {
     // generate main search moves
     MAIN_TT,
+    MAIN_TT2,
     CAPTURE_INIT,
     GOOD_CAPTURE,
     QUIET_INIT,
@@ -41,16 +42,19 @@ enum Stages {
 
     // generate evasion moves
     EVASION_TT,
+    EVASION_TT2,
     EVASION_INIT,
     EVASION,
 
     // generate probcut moves
     PROBCUT_TT,
+    PROBCUT_TT2,
     PROBCUT_INIT,
     PROBCUT,
 
     // generate qsearch moves
     QSEARCH_TT,
+    QSEARCH_TT2,
     QCAPTURE_INIT,
     QCAPTURE
 };
@@ -93,15 +97,35 @@ MovePicker::MovePicker(const Position&              p,
     captureHistory(cph),
     continuationHistory(ch),
     pawnHistory(ph),
-    ttMove{ttm[0], ttm[1]},
     depth(d),
     ply(pl) {
 
     if (pos.checkers())
-        stage = EVASION_TT + !(ttm[0] && pos.pseudo_legal(ttm[0]));
-
+        stage = EVASION_TT;
     else
-        stage = (depth > 0 ? MAIN_TT : QSEARCH_TT) + !(ttm && pos.pseudo_legal(ttm[0]));
+        stage = (depth > 0 ? MAIN_TT : QSEARCH_TT);
+
+    if (ttm[0] && pos.pseudo_legal(ttm[0]))
+    {
+        if (ttm[1] && pos.pseudo_legal(ttm[1]))
+        {
+            ttMove = ttm[0];
+            ttMove2 = ttm[1];
+        }
+        else
+        {
+            ttMove2 = ttm[0];
+            stage++;
+        }
+    } else {
+        if (ttm[1] && pos.pseudo_legal(ttm[1]))
+        {
+            ttMove2 = ttm[1];
+            stage++;
+        }
+        else
+            stage += 2;
+    }
 }
 
 // MovePicker constructor for ProbCut: we generate captures with Static Exchange
@@ -109,12 +133,34 @@ MovePicker::MovePicker(const Position&              p,
 MovePicker::MovePicker(const Position& p, Move ttm[2], int th, const CapturePieceToHistory* cph) :
     pos(p),
     captureHistory(cph),
-    ttMove{ttm[0], ttm[1]},
     threshold(th) {
     assert(!pos.checkers());
 
-    stage = PROBCUT_TT
-          + !(ttm && pos.capture_stage(ttm[0]) && pos.pseudo_legal(ttm[0]) && pos.see_ge(ttm[0], threshold));
+    auto check = [this](Move mov) {
+        return mov && pos.capture_stage(mov) && pos.pseudo_legal(mov) && pos.see_ge(mov, threshold);
+    };
+    stage = PROBCUT_TT;
+    if (check(ttm[0]))
+    {
+        if (check(ttm[1]))
+        {
+            ttMove = ttm[0];
+            ttMove2 = ttm[1];
+        }
+        else
+        {
+            ttMove2 = ttm[0];
+            stage++;
+        }
+    } else {
+        if (check(ttm[1]))
+        {
+            ttMove2 = ttm[1];
+            stage++;
+        }
+        else
+            stage += 2;
+    }
 }
 
 // Assigns a numerical value to each move in a list, used for sorting.
@@ -201,7 +247,7 @@ template<typename Pred>
 Move MovePicker::select(Pred filter) {
 
     for (; cur < endMoves; ++cur)
-        if (*cur != ttMove && filter())
+        if (*cur != ttMove && *cur != ttMove2 && filter())
             return *cur++;
 
     return Move::none();
@@ -224,6 +270,13 @@ top:
     case PROBCUT_TT :
         ++stage;
         return ttMove;
+
+    case MAIN_TT2 :
+    case EVASION_TT2 :
+    case QSEARCH_TT2 :
+    case PROBCUT_TT2 :
+        ++stage;
+        return ttMove2;
 
     case CAPTURE_INIT :
     case PROBCUT_INIT :
