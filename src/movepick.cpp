@@ -114,17 +114,23 @@ MovePicker::MovePicker(const Position&              p,
         }
         else
         {
+            ttMove = Move::none();
             ttMove2 = ttm[0];
             stage++;
         }
     } else {
         if (ttm[1] && pos.pseudo_legal(ttm[1]))
         {
+            ttMove = Move::none();
             ttMove2 = ttm[1];
             stage++;
         }
         else
+        {
+            ttMove = Move::none();
+            ttMove2 = Move::none();
             stage += 2;
+        }
     }
 }
 

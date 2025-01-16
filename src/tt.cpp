@@ -98,7 +98,7 @@ void TTEntry::save(
     // Preserve the old ttmove if we don't have a new one
     if (uint16_t(k) != key16)
         move16 = m;
-    else if (m) {
+    else if (m && move16 != m) {
         move2_16 = move16;
         move16 = m;
     }
