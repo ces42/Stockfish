@@ -119,18 +119,8 @@ MovePicker::MovePicker(const Position&              p,
             stage++;
         }
     } else {
-        if (ttm[1] && pos.pseudo_legal(ttm[1]))
-        {
-            ttMove = Move::none();
-            ttMove2 = ttm[1];
-            stage++;
-        }
-        else
-        {
-            ttMove = Move::none();
-            ttMove2 = Move::none();
-            stage += 2;
-        }
+        ttMove = ttMove2 = Move::none();
+        stage += 2;
     }
 }
 
@@ -155,17 +145,20 @@ MovePicker::MovePicker(const Position& p, Move ttm[2], int th, const CapturePiec
         }
         else
         {
+            ttMove = Move::none();
             ttMove2 = ttm[0];
             stage++;
         }
     } else {
         if (check(ttm[1]))
         {
+            ttMove = Move::none();
             ttMove2 = ttm[1];
             stage++;
-        }
-        else
+        } else {
+            ttMove = ttMove2 = Move::none();
             stage += 2;
+        }
     }
 }
 
