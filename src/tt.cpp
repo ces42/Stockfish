@@ -97,8 +97,12 @@ void TTEntry::save(
 
     // Preserve the old ttmove if we don't have a new one
     if (uint16_t(k) != key16)
+    {
         move16 = m;
-    else if (m && move16 != m) {
+        move2_16 = Move::none();
+    }
+    else if (m && move16 != m)
+    {
         move2_16 = move16;
         move16 = m;
     }
@@ -145,7 +149,7 @@ void TTWriter::write(
 // divide the size of a cache line for best performance, as the cacheline is prefetched when possible.
 
 // static constexpr int ClusterSize = 3;
-static constexpr int ClusterSize = 1;
+static constexpr int ClusterSize = 2;
 
 struct Cluster {
     TTEntry entry[ClusterSize];
