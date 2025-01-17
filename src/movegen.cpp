@@ -159,6 +159,9 @@ ExtMove* generate_moves(const Position& pos, ExtMove* moveList, Bitboard target)
         Square   from = pop_lsb(bb);
         Bitboard b    = attacks_bb<Pt>(from, pos.pieces()) & target;
 
+        if (from & pos.blockers_for_king(Us))
+            b &= line_bb(pos.square<KING>(Us), from);
+
         while (b)
             *moveList++ = Move(from, pop_lsb(b));
     }
