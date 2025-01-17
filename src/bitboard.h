@@ -192,20 +192,24 @@ inline bool aligned(Square s1, Square s2, Square s3) { return line_bb(s1, s2) & 
 // number of steps for a king in x to reach y.
 
 template<typename T1 = Square>
-inline int distance(Square x, Square y);
+inline uint8_t distance(Square x, Square y);
+
+constexpr uint8_t ABS[15] = {7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 6, 7};
 
 template<>
-inline int distance<File>(Square x, Square y) {
-    return std::abs(file_of(x) - file_of(y));
+inline uint8_t distance<File>(Square x, Square y) {
+    /*return std::abs(file_of(x) - file_of(y));*/
+    return ABS[7 + file_of(x) - file_of(y)];
 }
 
 template<>
-inline int distance<Rank>(Square x, Square y) {
-    return std::abs(rank_of(x) - rank_of(y));
+inline uint8_t distance<Rank>(Square x, Square y) {
+    /*return std::abs(rank_of(x) - rank_of(y));*/
+    return ABS[7 + rank_of(x) - rank_of(y)];
 }
 
 template<>
-inline int distance<Square>(Square x, Square y) {
+inline uint8_t distance<Square>(Square x, Square y) {
     return std::max(distance<Rank>(x, y), distance<File>(x, y));
 }
 
