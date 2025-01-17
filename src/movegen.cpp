@@ -159,9 +159,15 @@ ExtMove* generate_moves(const Position& pos, ExtMove* moveList, Bitboard target)
         Square   from = pop_lsb(bb);
         Bitboard b    = attacks_bb<Pt>(from, pos.pieces()) & target;
 
+        bool pinned = from & pos.blockers_for_king(Us);
         while (b)
-            *moveList++ = Move(from, pop_lsb(b));
+        {
+            Square to = pop_lsb(b);
+            if (! pinned || aligned(from, to, pos.square<KING>(Us)))
+                *moveList++ = Move(from, to);
+        }
     }
+
 
     return moveList;
 }
@@ -213,7 +219,7 @@ ExtMove* generate_all(const Position& pos, ExtMove* moveList, Bitboard threats) 
 //
 // Returns a pointer to the end of the move list.
 template<GenType Type>
-ExtMove* generate(const Position& pos, ExtMove* moveList, Bitboard threats) {
+ExtMove* generate(const Position& pos, ExtMove* moveList, [[maybe_unused]] Bitboard threats) {
 
     static_assert(Type != LEGAL, "Unsupported type in generate()");
     assert((Type == EVASIONS) == bool(pos.checkers()));
