@@ -250,7 +250,7 @@ top:
         {
             cur      = endBadCaptures;
             setup_score_bbs();
-            Bitboard threatened = threatenedByPawn | threatenedByMinor | threatenedByRook; // does not include threats by Queen
+            Bitboard threatened = threatenedByRook | pos.attacks_by<QUEEN>(~pos.side_to_move());
             endMoves = beginBadQuiets = endBadQuiets = generate<QUIETS>(pos, cur, threatened);
 
             score<QUIETS>();
