@@ -117,7 +117,7 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
           + !(ttm && pos.capture_stage(ttm) && pos.pseudo_legal(ttm) && pos.see_ge(ttm, threshold));
 }
 
-void MovePicker::setup_score_bbs() {
+Bitboard MovePicker::compute_threats() {
 
 	Color us = pos.side_to_move();
 
@@ -130,6 +130,8 @@ void MovePicker::setup_score_bbs() {
 	threatenedPieces = (pos.pieces(us, QUEEN) & threatenedByRook)
 					 | (pos.pieces(us, ROOK) & threatenedByMinor)
 					 | (pos.pieces(us, KNIGHT, BISHOP) & threatenedByPawn);
+
+    return threatenedByRook | pos.attacks_by<QUEEN>(~us) | pos.attacks_by<KING>(~us);
 }
 
 // Assigns a numerical value to each move in a list, used for sorting.
@@ -249,8 +251,7 @@ top:
         if (!skipQuiets)
         {
             cur      = endBadCaptures;
-            setup_score_bbs();
-            Bitboard threatened = threatenedByRook | pos.attacks_by<QUEEN>(~pos.side_to_move());
+            Bitboard threatened = compute_threats();
             endMoves = beginBadQuiets = endBadQuiets = generate<QUIETS>(pos, cur, threatened);
 
             score<QUIETS>();

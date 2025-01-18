@@ -56,7 +56,7 @@ class MovePicker {
     Move select(Pred);
     template<GenType>
     void     score();
-    void setup_score_bbs();
+    Bitboard compute_threats();
     ExtMove* begin() { return cur; }
     ExtMove* end() { return endMoves; }
 

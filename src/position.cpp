@@ -561,7 +561,7 @@ bool Position::legal(Move m) const {
 
     // If the moving piece is a king, check whether the destination square is
     // attacked by the opponent.
-    if (type_of(piece_on(from)) == KING)
+    if (type_of(piece_on(from)) == KING && (! empty(to) || checkers()))
         return !(attackers_to_exist(to, pieces() ^ from, ~us));
 
     // A non-king move is legal if and only if it is not pinned or it
@@ -633,6 +633,10 @@ bool Position::pseudo_legal(const Move m) const {
         // invalid moves like b1a1 when opposite queen is on c1.
         else if (attackers_to_exist(to, pieces() ^ from, ~us))
             return false;
+    } else if (type_of(pc) == KING && empty(to)) {
+        // quiet move generator does not generate illegal King moves, so we need to filter
+        // those out here too
+        return ! attackers_to_exist(to, pieces(), ~us);
     }
 
     return true;
