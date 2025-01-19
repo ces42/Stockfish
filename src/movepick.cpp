@@ -251,12 +251,10 @@ top:
         if (!skipQuiets)
         {
             cur      = endBadCaptures;
-            endMoves = endBadQuiets = generate<QUIETS>(pos, cur);
+            endMoves = beginBadQuiets = endBadQuiets = generate<QUIETS>(pos, cur);
 
             score<QUIETS>();
-            endMoves = beginBadQuiets = std::partition(cur, endMoves, [](ExtMove m) {return m.value > -7998;});
-            partial_insertion_sort(cur, beginBadQuiets, std::numeric_limits<int>::min());
-            partial_insertion_sort(beginBadQuiets, endBadQuiets, quiet_threshold(depth));
+            partial_insertion_sort(cur, endBadQuiets, std::min(-7998, quiet_threshold(depth)));
         }
 
         ++stage;
@@ -264,7 +262,13 @@ top:
 
     case GOOD_QUIET :
         if (!skipQuiets && select([]() { return true; }))
-            return *(cur - 1);
+        {
+            if ((cur - 1)->value > -7998)
+                return *(cur - 1);
+
+            // Remaining quiets are bad
+            beginBadQuiets = cur - 1;
+        }
 
         // Prepare the pointers to loop over the bad captures
         cur      = moves;
