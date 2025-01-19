@@ -256,6 +256,7 @@ top:
             score<QUIETS>();
             endMoves = beginBadQuiets = std::partition(cur, endMoves, [](ExtMove m) {return m.value > -7998;});
             partial_insertion_sort(cur, beginBadQuiets, std::numeric_limits<int>::min());
+            partial_insertion_sort(beginBadQuiets, endBadQuiets, std::numeric_limits<int>::min());
         }
 
         ++stage;
