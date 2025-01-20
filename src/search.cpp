@@ -723,6 +723,7 @@ Value Search::Worker::search(
     // Step 6. Static evaluation of the position
     Value      unadjustedStaticEval = VALUE_NONE;
     const auto correctionValue      = correction_value(*thisThread, pos, ss);
+    bool hint_common_parent = false;
     if (ss->inCheck)
     {
         // Skip early pruning when in check
@@ -734,7 +735,7 @@ Value Search::Worker::search(
     {
         // Providing the hint that this node's accumulator will be used often
         // brings significant Elo gain (~13 Elo).
-        Eval::NNUE::hint_common_parent_position(pos, networks[numaAccessToken], refreshTable);
+        hint_common_parent = true;
         unadjustedStaticEval = eval = ss->staticEval;
     }
     else if (ss->ttHit)
@@ -744,7 +745,7 @@ Value Search::Worker::search(
         if (!is_valid(unadjustedStaticEval))
             unadjustedStaticEval = evaluate(pos);
         else if (PvNode)
-            Eval::NNUE::hint_common_parent_position(pos, networks[numaAccessToken], refreshTable);
+            hint_common_parent = true;
 
         ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, correctionValue);
 
@@ -788,7 +789,13 @@ Value Search::Worker::search(
     // If eval is really low, skip search entirely and return the qsearch value.
     // For PvNodes, we must have a guard against mates being returned.
     if (!PvNode && eval < alpha - 462 - 297 * depth * depth)
+    {
+        if (hint_common_parent) {
+            Eval::NNUE::hint_common_parent_position(pos, networks[numaAccessToken], refreshTable);
+            hint_common_parent = false;
+        }
         return qsearch<NonPV>(pos, ss, alpha, beta);
+    }
 
     // Step 8. Futility pruning: child node (~40 Elo)
     // The depth condition is important for mate finding.
@@ -800,6 +807,9 @@ Value Search::Worker::search(
         return beta + (eval - beta) / 3;
 
     improving |= ss->staticEval >= beta + 97;
+
+    if (hint_common_parent)
+        Eval::NNUE::hint_common_parent_position(pos, networks[numaAccessToken], refreshTable);
 
     // Step 9. Null move search with verification search (~35 Elo)
     if (cutNode && (ss - 1)->currentMove != Move::null() && eval >= beta
