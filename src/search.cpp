@@ -737,7 +737,7 @@ Value Search::Worker::search(
     else if (excludedMove)
     {
         // Providing the hint that this node's accumulator will be used often
-        Eval::NNUE::hint_common_parent_position(pos, networks[numaAccessToken], refreshTable);
+        pos.state()->commonParentPos = true;
         unadjustedStaticEval = eval = ss->staticEval;
     }
     else if (ss->ttHit)
@@ -747,7 +747,7 @@ Value Search::Worker::search(
         if (!is_valid(unadjustedStaticEval))
             unadjustedStaticEval = evaluate(pos);
         else if (PvNode)
-            Eval::NNUE::hint_common_parent_position(pos, networks[numaAccessToken], refreshTable);
+            pos.state()->commonParentPos = true;
 
         ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, correctionValue);
 

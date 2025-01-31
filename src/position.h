@@ -50,6 +50,7 @@ struct StateInfo {
     int    rule50;
     int    pliesFromNull;
     Square epSquare;
+    int    pieceCount;
 
     // Not copied when making a move (will be recomputed anyhow)
     Key        key;
@@ -66,6 +67,7 @@ struct StateInfo {
     Eval::NNUE::Accumulator<Eval::NNUE::TransformedFeatureDimensionsBig>   accumulatorBig;
     Eval::NNUE::Accumulator<Eval::NNUE::TransformedFeatureDimensionsSmall> accumulatorSmall;
     DirtyPiece                                                             dirtyPiece;
+    bool                                                                   commonParentPos;
 };
 
 
