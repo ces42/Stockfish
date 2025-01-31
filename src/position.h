@@ -64,10 +64,10 @@ struct StateInfo {
     int        repetition;
 
     // Used by NNUE
+    bool                                                                   commonParentPos;
+    DirtyPiece                                                             dirtyPiece;
     Eval::NNUE::Accumulator<Eval::NNUE::TransformedFeatureDimensionsBig>   accumulatorBig;
     Eval::NNUE::Accumulator<Eval::NNUE::TransformedFeatureDimensionsSmall> accumulatorSmall;
-    DirtyPiece                                                             dirtyPiece;
-    bool                                                                   commonParentPos;
 };
 
 
