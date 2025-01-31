@@ -499,11 +499,10 @@ class FeatureTransformer {
                 || (gain -= FeatureSet::update_cost(st) + 1) < 0
                 || !st->previous)
             {
-                if constexpr (is_big) 
+                if constexpr (is_big)
                     return last_common;
-                else 
+                else
                     return nullptr;
-
             }
             st = st->previous;
         }
@@ -538,9 +537,7 @@ class FeatureTransformer {
         // is 2, since we are incrementally updating one move at a time.
         FeatureSet::IndexList removed, added;
         if constexpr (Backwards)
-        {
             FeatureSet::append_changed_indices<Perspective>(ksq, computed->dirtyPiece, added, removed);
-        }
         else
             FeatureSet::append_changed_indices<Perspective>(ksq, next->dirtyPiece, removed, added);
 
@@ -871,27 +868,17 @@ class FeatureTransformer {
             return;
         StateInfo* oldest = try_find_computed_accumulator<Perspective>(pos);
 
-        if (!oldest || !(oldest->*accPtr).computed[Perspective]) {
+        if (!oldest || !(oldest->*accPtr).computed[Perspective])
+        {
             update_accumulator_refresh_cache<Perspective>(pos, cache);
             if (oldest && oldest != pos.state())
-            {
                 update_accumulator_incremental<Perspective, true>(pos.square<KING>(Perspective), oldest, pos.state());
-                for(StateInfo* st = pos.state(); st; st = st->previous)
-                {
-                    assert((st->*accPtr).computed[Perspective]);
-                    if (st == oldest) break;
-                }
-            }
-        } else if (oldest != pos.state())
+        }
+        else if (oldest != pos.state())
+        {
             // Start from the oldest computed accumulator, update all the
             // accumulators up to the current position.
-        {
             update_accumulator_incremental<Perspective>(pos.square<KING>(Perspective), pos.state(), oldest);
-            for(StateInfo* st = pos.state(); st; st = st->previous)
-            {
-                assert((st->*accPtr).computed[Perspective]);
-                if (st == oldest) break;
-            }
         }
     }
 
