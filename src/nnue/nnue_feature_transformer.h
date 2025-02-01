@@ -125,8 +125,7 @@ using psqt_vec_t = int32x4_t;
     #define vec_add_16(a, b) vaddq_s16(a, b)
     #define vec_sub_16(a, b) vsubq_s16(a, b)
     #define vec_mulhi_16(a, b) vqdmulhq_s16(a, b)
-    #define vec_zero() \
-        vec_t { 0 }
+    #define vec_zero() vec_t{0}
     #define vec_set_16(a) vdupq_n_s16(a)
     #define vec_max_16(a, b) vmaxq_s16(a, b)
     #define vec_min_16(a, b) vminq_s16(a, b)
@@ -136,8 +135,7 @@ using psqt_vec_t = int32x4_t;
     #define vec_store_psqt(a, b) *(a) = (b)
     #define vec_add_psqt_32(a, b) vaddq_s32(a, b)
     #define vec_sub_psqt_32(a, b) vsubq_s32(a, b)
-    #define vec_zero_psqt() \
-        psqt_vec_t { 0 }
+    #define vec_zero_psqt() psqt_vec_t{0}
     #define NumRegistersSIMD 16
     #define MaxChunkSize 16
 
@@ -244,7 +242,7 @@ class SIMDTiling {
 
 // Input feature converter
 template<IndexType                                 TransformedFeatureDimensions,
-         Accumulator<TransformedFeatureDimensions> StateInfo::*accPtr>
+         Accumulator<TransformedFeatureDimensions> StateInfo::* accPtr>
 class FeatureTransformer {
 
     // Number of output dimensions for one side
@@ -476,42 +474,41 @@ class FeatureTransformer {
 
    private:
     template<Color Perspective>
-    StateInfo* try_find_computed_accumulator(const Position& pos) const {
-        // Look for a usable accumulator of an earlier position. We keep track
-        // of the estimated gain in terms of features to be added/subtracted.
-        // returns nullptr if no suitable computed accumulator can be found or
-        // a StateInfo* to a state with already computed accumulator
-        // or a StateInfo* to a "common parent position" with uncomputed accumulator
-        StateInfo* st   = pos.state();
-        int        gain = FeatureSet::refresh_cost(st);
-        StateInfo* last_common = nullptr;
-        constexpr bool is_big = TransformedFeatureDimensions == 3072u;
+    inline StateInfo* try_find_computed_accumulator(StateInfo* st) const {
+        // Look for a usable already computed accumulator of an earlier position. We
+        // keep track of the estimated gain in terms of features to be added/subtracted.
+        // returns either
+        //   (1) a StateInfo* to a state with already computed accumulator
+        //   (2) nullptr if no suitable computed accumulator can be found
+        //   (3) a StateInfo* to a "common parent position" with *uncomputed* accumulator
+        //       (case (3) will never return the same pointer as the argument)
+        int            gain        = FeatureSet::refresh_cost(st);
+        StateInfo*     last_common = nullptr;
+        constexpr bool Big = TransformedFeatureDimensions == TransformedFeatureDimensionsBig;
+
         while (!(st->*accPtr).computed[Perspective])
         {
-            if (is_big && st->commonParentPos)
-            {
-                last_common = st;
-                gain = FeatureSet::refresh_cost(st); // reset "gain"
-            }
             // This governs when a full feature refresh is needed and how many
             // updates are better than just one full refresh.
             if (FeatureSet::requires_refresh(st, Perspective)
-                || (gain -= FeatureSet::update_cost(st)) < 0
-                || !st->previous)
-            {
-                if constexpr (is_big)
-                    return last_common;
-                else
-                    return nullptr;
-            }
+                || (gain -= FeatureSet::update_cost(st)) < 0 || !st->previous)
+                return last_common;  // this will be nullptr if !Big
+
             st = st->previous;
+            if (Big && st->commonParentPos)
+            {
+                last_common = st;
+                gain        = FeatureSet::refresh_cost(st);  // reset "gain"
+            }
         }
         return st;
     }
 
     // Given a computed accumulator, computes the accumulator of the next position.
-    template<Color Perspective, bool Backwards=false>
-    void update_accumulator_incremental(const Square ksq, StateInfo* target_state, const StateInfo* computed) const {
+    template<Color Perspective, bool Backwards = false>
+    void update_accumulator_incremental(const Square     ksq,
+                                        StateInfo*       target_state,
+                                        const StateInfo* computed) const {
         assert((computed->*accPtr).computed[Perspective]);
         constexpr bool Forward = !Backwards;
 
@@ -537,7 +534,8 @@ class FeatureTransformer {
         // is 2, since we are incrementally updating one move at a time.
         FeatureSet::IndexList removed, added;
         if constexpr (Backwards)
-            FeatureSet::append_changed_indices<Perspective>(ksq, computed->dirtyPiece, added, removed);
+            FeatureSet::append_changed_indices<Perspective>(ksq, computed->dirtyPiece, added,
+                                                            removed);
         else
             FeatureSet::append_changed_indices<Perspective>(ksq, next->dirtyPiece, removed, added);
 
@@ -554,8 +552,10 @@ class FeatureTransformer {
         {
             assert(added.size() == 1 || added.size() == 2);
             assert(removed.size() == 1 || removed.size() == 2);
-            assert(Backwards || added.size() <= removed.size());
-            assert(!Backwards || removed.size() <= added.size());
+            if (Forward)
+                assert(added.size() <= removed.size());
+            else
+                assert(removed.size() <= added.size());
 
 #ifdef VECTOR
             auto* accIn =
@@ -567,12 +567,13 @@ class FeatureTransformer {
             const IndexType offsetR0 = HalfDimensions * removed[0];
             auto*           columnR0 = reinterpret_cast<const vec_t*>(&weights[offsetR0]);
 
-            if ((Forward && removed.size() == 1) || (Backwards && added.size() == 1)) // added.size() == removed.size() == 1
+            if ((Forward && removed.size() == 1)
+                || (Backwards && added.size() == 1))  // added.size() == removed.size() == 1
             {
                 for (IndexType i = 0; i < HalfDimensions * sizeof(WeightType) / sizeof(vec_t); ++i)
                     accOut[i] = vec_add_16(vec_sub_16(accIn[i], columnR0[i]), columnA0[i]);
             }
-            else if (Forward && added.size() == 1) // removed.size() == 2
+            else if (Forward && added.size() == 1)  // removed.size() == 2
             {
                 const IndexType offsetR1 = HalfDimensions * removed[1];
                 auto*           columnR1 = reinterpret_cast<const vec_t*>(&weights[offsetR1]);
@@ -581,7 +582,7 @@ class FeatureTransformer {
                     accOut[i] = vec_sub_16(vec_add_16(accIn[i], columnA0[i]),
                                            vec_add_16(columnR0[i], columnR1[i]));
             }
-            else if (Backwards && removed.size() == 1) // added.size() == 2
+            else if (Backwards && removed.size() == 1)  // added.size() == 2
             {
                 const IndexType offsetA1 = HalfDimensions * added[1];
                 auto*           columnA1 = reinterpret_cast<const vec_t*>(&weights[offsetA1]);
@@ -590,7 +591,7 @@ class FeatureTransformer {
                     accOut[i] = vec_add_16(vec_add_16(accIn[i], columnA0[i]),
                                            vec_sub_16(columnA1[i], columnR0[i]));
             }
-            else // added.size() == removed.size() == 2
+            else  // added.size() == removed.size() == 2
             {
                 const IndexType offsetA1 = HalfDimensions * added[1];
                 auto*           columnA1 = reinterpret_cast<const vec_t*>(&weights[offsetA1]);
@@ -613,7 +614,8 @@ class FeatureTransformer {
             const IndexType offsetPsqtR0 = PSQTBuckets * removed[0];
             auto* columnPsqtR0 = reinterpret_cast<const psqt_vec_t*>(&psqtWeights[offsetPsqtR0]);
 
-            if ((Forward && removed.size() == 1) || (Backwards && added.size() == 1)) // added.size() == removed.size() == 1
+            if ((Forward && removed.size() == 1)
+                || (Backwards && added.size() == 1))  // added.size() == removed.size() == 1
             {
                 for (std::size_t i = 0;
                      i < PSQTBuckets * sizeof(PSQTWeightType) / sizeof(psqt_vec_t); ++i)
@@ -864,21 +866,30 @@ class FeatureTransformer {
     template<Color Perspective>
     void update_accumulator(const Position&                           pos,
                             AccumulatorCaches::Cache<HalfDimensions>* cache) const {
-        if ((pos.state()->*accPtr).computed[Perspective])
-            return;
-        StateInfo* oldest = try_find_computed_accumulator<Perspective>(pos);
+        StateInfo* state  = pos.state();
+        StateInfo* oldest = try_find_computed_accumulator<Perspective>(state);
 
-        if (!oldest || !(oldest->*accPtr).computed[Perspective])
+        if (oldest == state)
         {
-            update_accumulator_refresh_cache<Perspective>(pos, cache);
-            if (oldest && oldest != pos.state())
-                update_accumulator_incremental<Perspective, true>(pos.square<KING>(Perspective), oldest, pos.state());
+            assert((state->*accPtr).computed[Perspective]);
+            return;
         }
-        else if (oldest != pos.state())
+        if (oldest == nullptr)
+            update_accumulator_refresh_cache<Perspective>(pos, cache);
+        else if ((oldest->*accPtr).computed[Perspective])
         {
             // Start from the oldest computed accumulator, update all the
             // accumulators up to the current position.
-            update_accumulator_incremental<Perspective>(pos.square<KING>(Perspective), pos.state(), oldest);
+            update_accumulator_incremental<Perspective>(pos.square<KING>(Perspective), state,
+                                                        oldest);
+        }
+        else
+        {
+            // this means that oldest points to a "common parent position", so we think
+            // computing computing its accumulator now will pay off later
+            update_accumulator_refresh_cache<Perspective>(pos, cache);
+            update_accumulator_incremental<Perspective, true>(pos.square<KING>(Perspective), oldest,
+                                                              state);
         }
     }
 
