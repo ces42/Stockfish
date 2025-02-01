@@ -496,7 +496,7 @@ class FeatureTransformer {
             // This governs when a full feature refresh is needed and how many
             // updates are better than just one full refresh.
             if (FeatureSet::requires_refresh(st, Perspective)
-                || (gain -= FeatureSet::update_cost(st) + 1) < 0
+                || (gain -= FeatureSet::update_cost(st)) < 0
                 || !st->previous)
             {
                 if constexpr (is_big)
