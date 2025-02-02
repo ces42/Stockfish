@@ -732,6 +732,7 @@ Value Search::Worker::search(
         // Skip early pruning when in check
         ss->staticEval = eval = (ss - 2)->staticEval;
         improving             = false;
+        pos.state()->commonParentPos = true;
         goto moves_loop;
     }
     else if (excludedMove)
