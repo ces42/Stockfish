@@ -47,8 +47,8 @@ struct StateInfo {
     Key    nonPawnKey[COLOR_NB];
     Value  nonPawnMaterial[COLOR_NB];
     int    castlingRights;
-    int    rule50;
-    int    pliesFromNull;
+    int16_t rule50;
+    int16_t pliesFromNull;
     Square epSquare;
 
     // Not copied when making a move (will be recomputed anyhow)
