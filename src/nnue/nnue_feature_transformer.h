@@ -529,14 +529,15 @@ class FeatureTransformer {
             const IndexType offsetR0 = HalfDimensions * removed[0];
             auto*           columnR0 = reinterpret_cast<const vec_t*>(&weights[offsetR0]);
 
-            if ((Forward && removed.size() == 1)
-                || (Backwards && added.size() == 1))  // added.size() == removed.size() == 1
+            if ((Forward && removed.size() == 1) || (Backwards && added.size() == 1))
             {
+                assert(added.size() == 1 && removed.size() == 1);
                 for (IndexType i = 0; i < HalfDimensions * sizeof(WeightType) / sizeof(vec_t); ++i)
                     accOut[i] = vec_add_16(vec_sub_16(accIn[i], columnR0[i]), columnA0[i]);
             }
-            else if (Forward && added.size() == 1)  // removed.size() == 2
+            else if (Forward && added.size() == 1)
             {
+                assert(removed.size() == 2);
                 const IndexType offsetR1 = HalfDimensions * removed[1];
                 auto*           columnR1 = reinterpret_cast<const vec_t*>(&weights[offsetR1]);
 
@@ -544,8 +545,9 @@ class FeatureTransformer {
                     accOut[i] = vec_sub_16(vec_add_16(accIn[i], columnA0[i]),
                                            vec_add_16(columnR0[i], columnR1[i]));
             }
-            else if (Backwards && removed.size() == 1)  // added.size() == 2
+            else if (Backwards && removed.size() == 1)
             {
+                assert(added.size() == 2);
                 const IndexType offsetA1 = HalfDimensions * added[1];
                 auto*           columnA1 = reinterpret_cast<const vec_t*>(&weights[offsetA1]);
 
@@ -553,8 +555,9 @@ class FeatureTransformer {
                     accOut[i] = vec_add_16(vec_add_16(accIn[i], columnA0[i]),
                                            vec_sub_16(columnA1[i], columnR0[i]));
             }
-            else  // added.size() == removed.size() == 2
+            else
             {
+                assert(added.size() == 2 && removed.size() == 2);
                 const IndexType offsetA1 = HalfDimensions * added[1];
                 auto*           columnA1 = reinterpret_cast<const vec_t*>(&weights[offsetA1]);
                 const IndexType offsetR1 = HalfDimensions * removed[1];
