@@ -473,7 +473,6 @@ class FeatureTransformer {
     }  // end of function transform()
 
    private:
-
     // Given a computed accumulator, computes the accumulator of another position.
     template<Color Perspective, IncUpdateDirection Direction = FORWARD>
     void update_accumulator_incremental(const Square     ksq,
@@ -845,27 +844,26 @@ class FeatureTransformer {
         do
         {
             if (FeatureSet::requires_refresh(st, Perspective)
-                || (!Big && (gain -= FeatureSet::update_cost(st) < 0)) || !st->previous || st->previous->next != st)
-                goto refresh;
+                || (!Big && (gain -= FeatureSet::update_cost(st) < 0)) || !st->previous
+                || st->previous->next != st)
+            {
+                // compute accumulator from scratch for this position
+                update_accumulator_refresh_cache<Perspective>(pos, cache);
+                if (Big && st != pos.state())
+                    // when computing a big accumulator from scratch we can use it to
+                    // efficiently compute the accumulator backwards, until we get to a king
+                    // move. We expect that we will need these accumulators later anyway, so
+                    // computing them now will save some work.
+                    update_accumulator_incremental<Perspective, BACKWARDS>(
+                      pos.square<KING>(Perspective), st, pos.state());
+                return;
+            }
             st = st->previous;
         } while (!(st->*accPtr).computed[Perspective]);
-
 
         // Start from the oldest computed accumulator, update all the
         // accumulators up to the current position.
         update_accumulator_incremental<Perspective>(pos.square<KING>(Perspective), pos.state(), st);
-        return;
-
-refresh:
-        // compute accumulator from scratch for this position
-        update_accumulator_refresh_cache<Perspective>(pos, cache);
-        if (Big && st != pos.state())
-            // when computing a big accumulator from scratch we can use it to
-            // efficiently compute the accumulator backwards, until we get to a king
-            // move. We expect that we will need these accumulators later anyway, so
-            // computing them now will save some work.
-            update_accumulator_incremental<Perspective, BACKWARDS>(pos.square<KING>(Perspective),
-                                                                   st, pos.state());
     }
 
     template<IndexType Size>
