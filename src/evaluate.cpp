@@ -41,7 +41,8 @@ namespace Stockfish {
 // the point of view of the given color. It can be divided by PawnValue to get
 // an approximation of the material advantage on the board in terms of pawns.
 int Eval::simple_eval(const Position& pos) {
-    return 20 + PawnValue * (pos.count<PAWN>(WHITE) - pos.count<PAWN>(BLACK))
+    return 20 - 40 * pos.side_to_move() // 20 if white to move -20 if black to move
+         + PawnValue * (pos.count<PAWN>(WHITE) - pos.count<PAWN>(BLACK))
          + (pos.non_pawn_material(WHITE) - pos.non_pawn_material(BLACK));
 }
 
