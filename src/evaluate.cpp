@@ -41,14 +41,14 @@ namespace Stockfish {
 // the point of view of the given color. It can be divided by PawnValue to get
 // an approximation of the material advantage on the board in terms of pawns.
 int Eval::simple_eval(const Position& pos) {
-    return 20 - 40 * pos.side_to_move() // 20 if white to move -20 if black to move
+    return 100 - 200 * pos.side_to_move()
          + PawnValue * (pos.count<PAWN>(WHITE) - pos.count<PAWN>(BLACK))
          + (pos.non_pawn_material(WHITE) - pos.non_pawn_material(BLACK));
 }
 
 bool Eval::use_smallnet(const Position& pos) {
     int simpleEval = simple_eval(pos);
-    return std::abs(simpleEval) > 1000;
+    return std::abs(simpleEval) > 940;
 }
 
 // Evaluate is the evaluator for the outer world. It returns a static evaluation
