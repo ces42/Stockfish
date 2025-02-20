@@ -134,7 +134,7 @@ void Position::init() {
     // clusterCount = 16 MB / 32 bytes per TT entry = 2^19
     // so the index for a given key is 
     // key * clusterCount >> 64 = key >> 45
-    Zobrist::side    = (1L << 45) + 1;
+    Zobrist::side    = (1ULL << 45) + 1;
     Zobrist::noPawns = rng.rand<Key>();
 
     // Prepare the cuckoo tables
