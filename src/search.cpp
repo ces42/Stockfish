@@ -98,8 +98,8 @@ int correction_value(const Worker& w, const Position& pos, const Stack* const ss
 
 int risk_tolerance(const Position& pos, Value v) {
     // Returns (some constant of) second derivative of sigmoid.
-    static constexpr auto sigmoid_d2 = [](int x, int y) {
-        return -345600 * x / (x * x + 3 * y * y);
+    static constexpr auto sigmoid_d2_over_y = [](int x, int y) {
+        return -345600 * x / ((x * x + 3 * y * y) * y);
     };
 
     int material = pos.count<PAWN>() + 3 * pos.count<KNIGHT>() + 3 * pos.count<BISHOP>()
@@ -116,10 +116,10 @@ int risk_tolerance(const Position& pos, Value v) {
 
     // The risk utility is therefore d/dv^2 (1/(1+exp(-(v-a)/b)) -1/(1+exp(-(-v-a)/b)))
     // -115200x/(x^2+3) = -345600(ab) / (a^2+3b^2) (multiplied by some constant) (second degree pade approximant)
-    int winning_risk = sigmoid_d2(v - a, b);
-    int losing_risk  = -sigmoid_d2(-v - a, b);
+    int winning_risk = sigmoid_d2_over_y(v - a, b);
+    int losing_risk  = sigmoid_d2_over_y(v + a, b);
 
-    return (winning_risk + losing_risk) * 60 / b;
+    return (winning_risk + losing_risk) * 60;
 }
 
 // Add correctionHistory value to raw staticEval and guarantee evaluation
