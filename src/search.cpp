@@ -96,6 +96,7 @@ int correction_value(const Worker& w, const Position& pos, const Stack* const ss
     return 6995 * pcv + 6593 * micv + 7753 * (wnpcv + bnpcv) + 6049 * cntcv;
 }
 
+// Value should be between +-1200
 int risk_tolerance(const Position& pos, Value v) {
     // Returns (some constant of) second derivative of sigmoid.
     static constexpr auto sigmoid_d2_over_y = [](int x, int y) {
@@ -1193,7 +1194,7 @@ moves_loop:  // When in check, search starts here
 
         r -= std::abs(correctionValue) / 31568;
 
-        if (PvNode && bestValue <= 1500)
+        if (PvNode && std::abs(bestValue) <= 1200)
             r -= risk_tolerance(pos, bestValue);
 
         // Increase reduction for cut nodes
