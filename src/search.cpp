@@ -117,7 +117,7 @@ int risk_tolerance(const Position& pos, Value v) {
     // The win rate is: 1/(1+exp((a-v)/b))
     // The loss rate is 1/(1+exp((v+a)/b))
     // int b = ((m * 7761 - 2674 * 256) * m + 314 * 256 * 256) * m / (256 * 256 * 256) + 51;
-    int b = (((m * x1 - x2) * m + x3) * m + x4) / (2 << 20);
+    int b = (((m * x1 - x2) * m + x3) * m + x4) / (1 << 20);
     // b in [60, 120]
 
 
