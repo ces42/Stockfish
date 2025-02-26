@@ -98,8 +98,8 @@ int correction_value(const Worker& w, const Position& pos, const Stack* const ss
 
 int risk_tolerance(const Position& pos, Value v) {
     // Returns (some constant of) second derivative of sigmoid.
-    static constexpr auto sigmoid_d2_over_y = [](int x, int y) {
-        return -345600 * x / ((x * x + 3 * y * y) * y);
+    static constexpr auto sigmoid_d2 = [](int x, int y) {
+        return -345600 * x / (x * x + 3 * y * y);
     };
 
     int material = pos.count<PAWN>() + 3 * pos.count<KNIGHT>() + 3 * pos.count<BISHOP>()
@@ -110,16 +110,17 @@ int risk_tolerance(const Position& pos, Value v) {
     // a and b are the crude approximation of the wdl model.
     // The win rate is: 1/(1+exp((a-v)/b))
     // The loss rate is 1/(1+exp((v+a)/b))
-    int a = ((-m * 3220 / 256 + 2361) * m / 256 - 586) * m / 256 + 421;
+    int a = 376;
     int b = ((m * 7761 / 256 - 2674) * m / 256 + 314) * m / 256 + 51;
+    // b in [60, 120]
 
 
     // The risk utility is therefore d/dv^2 (1/(1+exp(-(v-a)/b)) -1/(1+exp(-(-v-a)/b)))
     // -115200x/(x^2+3) = -345600(ab) / (a^2+3b^2) (multiplied by some constant) (second degree pade approximant)
-    int winning_risk = sigmoid_d2_over_y(v - a, b);
-    int losing_risk  = sigmoid_d2_over_y(v + a, b);
+    int winning_risk = sigmoid_d2(-a + v, b);
+    int losing_risk  = -sigmoid_d2(-a -v, b);
 
-    return (winning_risk + losing_risk) * 60;
+    return (winning_risk + losing_risk) * 60 / b;
 }
 
 // Add correctionHistory value to raw staticEval and guarantee evaluation
