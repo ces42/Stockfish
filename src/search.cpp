@@ -99,7 +99,7 @@ int correction_value(const Worker& w, const Position& pos, const Stack* const ss
 #include "tune.h"
 int a = 376;
 int C = 345600 * 3/2;
-int x1 = 7761, x2 = 2674 << 8, x3 = 314 << 16, x4 = 51 << 24;
+int x1 = 7761 >> 4, x2 = 2674 << 4, x3 = 314 << 12, x4 = 51 << 20;
 TUNE(a, C, x1, x2, x3, x4);
 
 int risk_tolerance(const Position& pos, Value v) {
@@ -117,7 +117,7 @@ int risk_tolerance(const Position& pos, Value v) {
     // The win rate is: 1/(1+exp((a-v)/b))
     // The loss rate is 1/(1+exp((v+a)/b))
     // int b = ((m * 7761 - 2674 * 256) * m + 314 * 256 * 256) * m / (256 * 256 * 256) + 51;
-    int b = (((m * x1 - x2) * m + x3) * m + x4)/ (256 * 256 * 256);
+    int b = (((m * x1 - x2) * m + x3) * m + x4) / (2 << 20);
     // b in [60, 120]
 
 
