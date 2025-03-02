@@ -28,10 +28,12 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <iostream>
+#include <limits>
 #include <list>
 #include <ratio>
 #include <string>
 #include <utility>
+#include <limits>
 
 #include "evaluate.h"
 #include "history.h"
