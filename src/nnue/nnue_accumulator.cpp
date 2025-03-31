@@ -351,9 +351,9 @@ void update_accumulator_refresh_cache(
   AccumulatorCaches::Cache<Dimensions>&         cache) {
     using Tiling [[maybe_unused]] = SIMDTiling<Dimensions, Dimensions>;
 
-    // int             pc_left = pos.total_count();
-    // dbg_mean_of(pc_left);
-    int pc_left = 1;
+    int             pc_left = pos.total_count();
+    dbg_mean_of(pc_left);
+    // int pc_left = 1;
     const Square          ksq   = pos.square<KING>(Perspective);
     auto&                 entry = cache[ksq][Perspective];
     FeatureSet::IndexList removed, added;
@@ -369,22 +369,22 @@ void update_accumulator_refresh_cache(
             Bitboard       toRemove = oldBB & ~newBB;
             Bitboard       toAdd    = newBB & ~oldBB;
 
-            // while (newBB) {
-            //     Square sq = pop_lsb(newBB);
-            //     pieces.push_back(FeatureSet::make_index<Perspective>(sq, piece, ksq));
-            // }
+            while (newBB) {
+                Square sq = pop_lsb(newBB);
+                pieces.push_back(FeatureSet::make_index<Perspective>(sq, piece, ksq));
+            }
 
-            while (toRemove && pc_left)
+            while (toRemove)
             {
                 Square sq = pop_lsb(toRemove);
                 removed.push_back(FeatureSet::make_index<Perspective>(sq, piece, ksq));
-                // pc_left--;
+                pc_left--;
             }
-            while (toAdd && pc_left)
+            while (toAdd)
             {
                 Square sq = pop_lsb(toAdd);
                 added.push_back(FeatureSet::make_index<Perspective>(sq, piece, ksq));
-                // pc_left--;
+                pc_left--;
             }
         }
     }
