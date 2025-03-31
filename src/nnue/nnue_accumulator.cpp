@@ -351,9 +351,13 @@ void update_accumulator_refresh_cache(
   AccumulatorCaches::Cache<Dimensions>&         cache) {
     using Tiling [[maybe_unused]] = SIMDTiling<Dimensions, Dimensions>;
 
+    // int             pc_left = pos.total_count();
+    // dbg_mean_of(pc_left);
+    int pc_left = 1;
     const Square          ksq   = pos.square<KING>(Perspective);
     auto&                 entry = cache[ksq][Perspective];
     FeatureSet::IndexList removed, added;
+    FeatureSet::IndexList pieces;
 
     for (Color c : {WHITE, BLACK})
     {
@@ -361,26 +365,38 @@ void update_accumulator_refresh_cache(
         {
             const Piece    piece    = make_piece(c, pt);
             const Bitboard oldBB    = entry.byColorBB[c] & entry.byTypeBB[pt];
-            const Bitboard newBB    = pos.pieces(c, pt);
+            Bitboard newBB    = pos.pieces(c, pt);
             Bitboard       toRemove = oldBB & ~newBB;
             Bitboard       toAdd    = newBB & ~oldBB;
 
-            while (toRemove)
+            // while (newBB) {
+            //     Square sq = pop_lsb(newBB);
+            //     pieces.push_back(FeatureSet::make_index<Perspective>(sq, piece, ksq));
+            // }
+
+            while (toRemove && pc_left)
             {
                 Square sq = pop_lsb(toRemove);
                 removed.push_back(FeatureSet::make_index<Perspective>(sq, piece, ksq));
+                // pc_left--;
             }
-            while (toAdd)
+            while (toAdd && pc_left)
             {
                 Square sq = pop_lsb(toAdd);
                 added.push_back(FeatureSet::make_index<Perspective>(sq, piece, ksq));
+                // pc_left--;
             }
         }
     }
 
     auto& accumulator                 = accumulatorState.*accPtr;
     accumulator.computed[Perspective] = true;
+    // dbg_hit_on(pc_left);
+    // dbg_mean_of(removed.size() + added.size(), 1);
+    // dbg_mean_of(removed.size() + added.size() - pc_left, 2);
+    // assert(pc_left + pieces.size() == pos.total_count());
 
+    if (true) {
 #ifdef VECTOR
     const bool combineLast3 =
       std::abs((int) removed.size() - (int) added.size()) == 1 && removed.size() + added.size() > 2;
@@ -542,6 +558,88 @@ void update_accumulator_refresh_cache(
 
     for (PieceType pt = PAWN; pt <= KING; ++pt)
         entry.byTypeBB[pt] = pos.pieces(pt);
+    } else {
+#ifdef VECTOR
+        assert(false);
+        // const bool odd = pieces...
+        vec_t      acc[Tiling::NumRegs];
+        psqt_vec_t psqt[Tiling::NumPsqtRegs];
+
+        for (IndexType j = 0; j < Dimensions / Tiling::TileHeight; ++j)
+        {
+            auto* accTile =
+              reinterpret_cast<vec_t*>(&accumulator.accumulation[Perspective][j * Tiling::TileHeight]);
+
+            // memcpy(&acc, &first_offset, Dimensions * sizeof(BiasType));
+            const IndexType first_offset = Dimensions * pieces[0] + j * Tiling::TileHeight;
+            auto* first_column = reinterpret_cast<const vec_t*>(&featureTransformer.weights[first_offset]);
+            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+                acc[k] = first_column[k];
+
+            for (std::size_t i = 1; i < pieces.size(); ++i)
+            {
+                IndexType       index  = pieces[i];
+                const IndexType offset = Dimensions * index + j * Tiling::TileHeight;
+                auto* column = reinterpret_cast<const vec_t*>(&featureTransformer.weights[offset]);
+
+                for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+                    acc[k] = vec_add_16(acc[k], column[k]);
+            }
+
+            for (IndexType k = 0; k < Tiling::NumRegs; k++)
+                vec_store(&accTile[k], acc[k]);
+        }
+
+        for (IndexType j = 0; j < PSQTBuckets / Tiling::PsqtTileHeight; ++j)
+        {
+            auto* accTilePsqt = reinterpret_cast<psqt_vec_t*>(
+              &accumulator.psqtAccumulation[Perspective][j * Tiling::PsqtTileHeight]);
+
+            const IndexType first_offset = PSQTBuckets * added[0] + j * Tiling::PsqtTileHeight;
+            auto*           first_columnPsqt =
+              reinterpret_cast<const psqt_vec_t*>(&featureTransformer.psqtWeights[first_offset]);
+
+            for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
+                psqt[k] = first_columnPsqt[k];
+
+            for (std::size_t i = 1; i < added.size(); ++i)
+            {
+                IndexType       index  = added[i];
+                const IndexType offset = PSQTBuckets * index + j * Tiling::PsqtTileHeight;
+                auto*           columnPsqt =
+                  reinterpret_cast<const psqt_vec_t*>(&featureTransformer.psqtWeights[offset]);
+
+                for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
+                    psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
+            }
+
+            for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
+                vec_store_psqt(&accTilePsqt[k], psqt[k]);
+        }
+
+#else
+
+        for (const auto index : removed)
+        {
+            const IndexType offset = Dimensions * index;
+            for (IndexType j = 0; j < Dimensions; ++j)
+                accumulator.accumulation[j] -= featureTransformer.weights[offset + j];
+
+            for (std::size_t k = 0; k < PSQTBuckets; ++k)
+                accumulator.psqtAccumulation[k] -= featureTransformer.psqtWeights[index * PSQTBuckets + k];
+        }
+        for (const auto index : added)
+        {
+            const IndexType offset = Dimensions * index;
+            for (IndexType j = 0; j < Dimensions; ++j)
+                accumulator.accumulation[j] += featureTransformer.weights[offset + j];
+
+            for (std::size_t k = 0; k < PSQTBuckets; ++k)
+                accumulator.psqtAccumulation[k] += featureTransformer.psqtWeights[index * PSQTBuckets + k];
+        }
+#endif
+    }
+
 }
 
 }
