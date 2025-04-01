@@ -358,6 +358,7 @@ void update_accumulator_refresh_cache(
   AccumulatorCaches::Cache<Dimensions>&         cache) {
     using Tiling [[maybe_unused]] = SIMDTiling<Dimensions, Dimensions>;
     constexpr bool Big = Dimensions == TransformedFeatureDimensionsBig;
+
     if constexpr (!Big)
     {
         update_accumulator_from_scratch<Perspective, false>(featureTransformer, pos, accumulatorState, cache);
@@ -665,33 +666,36 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions, accPtr
 
 #else
     for (IndexType j = 0; j < Dimensions; ++j)
-        entry.accumulation[j] = featureTransformer.biases[j];
+        accumulator.accumulation[Perspective][j] = featureTransformer.biases[j];
 
     for (std::size_t k = 0; k < PSQTBuckets; ++k)
-        entry.psqtAccumulation[k] = 0;
+        accumulator.psqtAccumulation[Perspective][k] = 0;
 
     for (const auto index : pieces)
     {
         const IndexType offset = Dimensions * index;
         for (IndexType j = 0; j < Dimensions; ++j)
-            entry.accumulation[j] += featureTransformer.weights[offset + j];
+            accumulator.accumulation[Perspective][j] += featureTransformer.weights[offset + j];
 
         for (std::size_t k = 0; k < PSQTBuckets; ++k)
-            entry.psqtAccumulation[k] += featureTransformer.psqtWeights[index * PSQTBuckets + k];
+            accumulator.psqtAccumulation[Perspective][k] += featureTransformer.psqtWeights[index * PSQTBuckets + k];
     }
     // The accumulator of the refresh entry has been updated.
     // Now copy its content to the actual accumulator we were refreshing.
 
-    std::memcpy(accumulator.accumulation[Perspective], entry.accumulation,
-                sizeof(BiasType) * Dimensions);
+    if constexpr (UpdateCache)
+    {
+        std::memcpy(entry.accumulation, accumulator.accumulation[Perspective],
+                    sizeof(BiasType) * Dimensions);
+        std::memcpy(entry.psqtAccumulation, accumulator.psqtAccumulation[Perspective],
+                    sizeof(int32_t) * PSQTBuckets);
+    }
 
-    std::memcpy(accumulator.psqtAccumulation[Perspective], entry.psqtAccumulation,
-                sizeof(int32_t) * PSQTBuckets);
 #endif
 
     if constexpr (UpdateCache) {
         for (Color c : {WHITE, BLACK})
-        entry.byColorBB[c] = pos.pieces(c);
+            entry.byColorBB[c] = pos.pieces(c);
 
         for (PieceType pt = PAWN; pt <= KING; ++pt)
             entry.byTypeBB[pt] = pos.pieces(pt);
