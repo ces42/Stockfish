@@ -100,7 +100,6 @@ class Position {
     int count(Color c) const;
     template<PieceType Pt>
     int count() const;
-    int total_count() const;
     template<PieceType Pt>
     Square square(Color c) const;
 
@@ -241,10 +240,6 @@ inline int Position::count() const {
     return count<Pt>(WHITE) + count<Pt>(BLACK);
 }
 
-inline int Position::total_count() const {
-    return pieceCount[ANY_PIECE];
-}
-
 template<PieceType Pt>
 inline Square Position::square(Color c) const {
     assert(count<Pt>(c) == 1);
@@ -344,7 +339,6 @@ inline void Position::put_piece(Piece pc, Square s) {
     byColorBB[color_of(pc)] |= s;
     pieceCount[pc]++;
     pieceCount[make_piece(color_of(pc), ALL_PIECES)]++;
-    pieceCount[ANY_PIECE]++;
 }
 
 inline void Position::remove_piece(Square s) {
@@ -356,7 +350,6 @@ inline void Position::remove_piece(Square s) {
     board[s] = NO_PIECE;
     pieceCount[pc]--;
     pieceCount[make_piece(color_of(pc), ALL_PIECES)]--;
-    pieceCount[ANY_PIECE]--;
 }
 
 inline void Position::move_piece(Square from, Square to) {
