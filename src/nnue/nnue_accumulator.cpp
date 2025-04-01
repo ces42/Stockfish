@@ -606,9 +606,21 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions, accPtr
         for (IndexType k = 0; k < Tiling::NumRegs; ++k)
             acc[k] = biasTile[k];
 
-        for (std::size_t i = 0; i < pieces.size(); ++i)
+        for (std::size_t i = 0; i < pieces.size() / 2; ++i)
         {
-            IndexType       index  = pieces[i];
+            IndexType       index1  = pieces[2*i];
+            const IndexType offset1 = Dimensions * index1 + j * Tiling::TileHeight;
+            auto* column1 = reinterpret_cast<const vec_t*>(&featureTransformer.weights[offset1]);
+            IndexType       index2  = pieces[2*i+1];
+            const IndexType offset2 = Dimensions * index2 + j * Tiling::TileHeight;
+            auto* column2 = reinterpret_cast<const vec_t*>(&featureTransformer.weights[offset2]);
+
+            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+                acc[k] = vec_add_16(acc[k], vec_add_16(column1[k], column2[k]));
+        }
+        if (pieces.size() % 2 == 1)
+        {
+            IndexType       index  = pieces[pieces.size() - 1];
             const IndexType offset = Dimensions * index + j * Tiling::TileHeight;
             auto* column = reinterpret_cast<const vec_t*>(&featureTransformer.weights[offset]);
 
