@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iosfwd>
+#include <set>
 
 #include "../position.h"
 #include "../types.h"
@@ -372,25 +373,30 @@ class FeatureTransformer {
         permute_weights();
         scale_weights(true);
 
-        // rearrange_biases();
+        rearrange_biases();
         return !stream.fail();
     }
 
     void rearrange_biases() {
-        for (bool persp : {WHITE, BLACK})
+        assert(
+            Features::HalfKAv2_hm::make_index<WHITE>(SQ_A1, W_KING, SQ_A1) ==
+            Features::HalfKAv2_hm::make_index<WHITE>(SQ_H1, W_KING, SQ_H1)
+        );
+        for (Square ksq = SQ_A1; ksq <= SQ_H8; ++ksq)
         {
-            for (Square ksq = SQ_A1; ksq <= SQ_H8; ++ksq)
-            {
-                IndexType index = persp == WHITE ? Features::HalfKAv2_hm::make_index<WHITE>(ksq, W_KING, ksq)
-                                                 : Features::HalfKAv2_hm::make_index<BLACK>(ksq, B_KING, ksq);
-                const IndexType offset = TransformedFeatureDimensions * index;
-                for (IndexType j = 0; j < TransformedFeatureDimensions; ++j)
-                {
-                    weights[offset + j] += biases[j];
-                }
-            }
+            if (ksq % 8 >= 4)
+                continue;
+            IndexType index = Features::HalfKAv2_hm::make_index<WHITE>(ksq, W_KING, ksq);
+            const IndexType offset = HalfDimensions * index;
+            for (IndexType j = 0; j < HalfDimensions; ++j)
+                weights[offset + j] += biases[j];
         }
-        for (IndexType j = 0; j < TransformedFeatureDimensions; ++j)
+
+        memset(biases, 0, sizeof(biases));
+        for (size_t i = 0; i < sizeof(biases); ++i)
+            assert(((char *) biases)[i] == 0);
+
+        for (IndexType j = 0; j < HalfDimensions; ++j)
             biases[j] = 0;
     }
 

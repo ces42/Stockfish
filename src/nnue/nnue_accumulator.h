@@ -87,9 +87,12 @@ struct AccumulatorCaches {
             // so we put the biases in the accumulation, without any weights on top
             void clear(const BiasType* biases) {
 
+                // assert(((char *) biases)[0] == 0);
+                // assert(std::memcmp(biases, (char *) biases + 1, sizeof(biases) - 1));
                 std::memcpy(accumulation, biases, sizeof(accumulation));
                 std::memset((uint8_t*) this + offsetof(Entry, psqtAccumulation), 0,
                             sizeof(Entry) - offsetof(Entry, psqtAccumulation));
+                // std::memset((uint8_t*) this, 0, sizeof(Entry));
             }
         };
 
