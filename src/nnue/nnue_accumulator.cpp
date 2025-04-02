@@ -402,12 +402,6 @@ void update_accumulator_refresh_cache(
             }
         }
     }
-    if (entry.byColorBB[WHITE] == 0)
-    {
-        assert(entry.byColorBB[BLACK] == 0);
-        if (Perspective == BLACK)
-            assert(added[added.size() - 1] == Features::HalfKAv2_hm::make_index<BLACK>(ksq, B_KING, ksq));
-    }
 
     auto& accumulator                 = accumulatorState.*accPtr;
     accumulator.computed[Perspective] = true;
@@ -416,13 +410,15 @@ void update_accumulator_refresh_cache(
     // dbg_hit_on(pc_left > 0);
     // dbg_hit_on(pc_left == 0, 1);
 
+    // pc_left <= 0 vs pc_left <= 1 here gives:
+    //     speedup        = +0.0006 +/- 0.0012
     if (pc_left <= 0)
     {
         update_accumulator_from_scratch<Perspective, true>(featureTransformer, pos, accumulatorState, cache);
         return;
     }
 
-    dbg_mean_of(removed.size() + added.size(), 3);
+    // dbg_mean_of(removed.size() + added.size(), 3);
     for (Color c : {WHITE, BLACK})
         entry.byColorBB[c] = pos.pieces(c);
 
@@ -602,8 +598,8 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions, accPtr
     FeatureSet::IndexList pieces;
     Features::HalfKAv2_hm::append_active_indices<Perspective>(pos, pieces);
 
-    if (Dimensions == TransformedFeatureDimensionsBig)
-        dbg_mean_of(pieces.size(), 4);
+    // if (Dimensions == TransformedFeatureDimensionsBig)
+    //     dbg_mean_of(pieces.size(), 4);
 #ifdef VECTOR
 
     // const bool odd = pieces...
@@ -617,10 +613,9 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions, accPtr
         auto* accTile =
           reinterpret_cast<vec_t*>(&accumulator.accumulation[Perspective][j * Tiling::TileHeight]);
 
-        auto* biasTile = reinterpret_cast<const vec_t*>(&featureTransformer.biases[j * Tiling::TileHeight]);
-        for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-            acc[k] = biasTile[k];
-            // acc[k] = _mm256_setzero_si256();
+        // auto* biasTile = reinterpret_cast<const vec_t*>(&featureTransformer.biases[j * Tiling::TileHeight]);
+        // for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+        //     acc[k] = biasTile[k];
 
         IndexType       first_index  = pieces[0];
         const IndexType first_offset = Dimensions * first_index + j * Tiling::TileHeight;
@@ -629,8 +624,8 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions, accPtr
         if (pieces.size() % 2 == 1) // odd case
         {
             for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-                // acc[k] = first_column[k];
-                acc[k] = vec_add_16(acc[k], first_column[k]);
+                acc[k] = first_column[k];
+                // acc[k] = vec_add_16(acc[k], first_column[k]);
         }
         else // even case
         {
@@ -639,8 +634,8 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions, accPtr
             auto* last_column = reinterpret_cast<const vec_t*>(&featureTransformer.weights[last_offset]);
 
             for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-                // acc[k] = vec_add_16(first_column[k], last_column[k]);
-                acc[k] = vec_add_16(acc[k], vec_add_16(first_column[k], last_column[k]));
+                acc[k] = vec_add_16(first_column[k], last_column[k]);
+                // acc[k] = vec_add_16(acc[k], vec_add_16(first_column[k], last_column[k]));
         }
 
         for (std::size_t i = 1; i < (pieces.size() + 1) / 2; ++i)

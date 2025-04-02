@@ -393,11 +393,6 @@ class FeatureTransformer {
         }
 
         memset(biases, 0, sizeof(biases));
-        for (size_t i = 0; i < sizeof(biases); ++i)
-            assert(((char *) biases)[i] == 0);
-
-        for (IndexType j = 0; j < HalfDimensions; ++j)
-            biases[j] = 0;
     }
 
     // Write network parameters
