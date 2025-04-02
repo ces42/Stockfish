@@ -359,14 +359,15 @@ void update_accumulator_refresh_cache(
     using Tiling [[maybe_unused]] = SIMDTiling<Dimensions, Dimensions>;
     constexpr bool Big = Dimensions == TransformedFeatureDimensionsBig;
 
-    if constexpr (!Big)
-    {
-        update_accumulator_from_scratch<Perspective, false>(featureTransformer, pos, accumulatorState, cache);
-        return;
-    }
-
     int pc_left = popcount(pos.pieces());
-    // dbg_mean_of(pc_left);
+    // dbg_mean_of(pc_left, Big);
+
+    // if (!Big && pc_left < 10)
+    // {
+    //     update_accumulator_from_scratch<Perspective, false>(featureTransformer, pos, accumulatorState, cache);
+    //     return;
+    // }
+
     const Square          ksq   = pos.square<KING>(Perspective);
     auto&                 entry = cache[ksq][Perspective];
     FeatureSet::IndexList removed, added;
@@ -405,13 +406,14 @@ void update_accumulator_refresh_cache(
 
     auto& accumulator                 = accumulatorState.*accPtr;
     accumulator.computed[Perspective] = true;
-    // dbg_mean_of(removed.size() + added.size(), 1);
+    // dbg_mean_of(removed.size() + added.size(), 2 + Big);
     // dbg_mean_of(pc_left, 2);
     // dbg_hit_on(pc_left > 0);
     // dbg_hit_on(pc_left == 0, 1);
 
     // pc_left <= 0 vs pc_left <= 1 here gives:
     //     speedup        = +0.0006 +/- 0.0012
+    // (measured by bench)
     if (pc_left <= 0)
     {
         update_accumulator_from_scratch<Perspective, true>(featureTransformer, pos, accumulatorState, cache);
@@ -598,8 +600,8 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions, accPtr
     FeatureSet::IndexList pieces;
     Features::HalfKAv2_hm::append_active_indices<Perspective>(pos, pieces);
 
-    // if (Dimensions == TransformedFeatureDimensionsBig)
-    //     dbg_mean_of(pieces.size(), 4);
+    constexpr bool Big = Dimensions == TransformedFeatureDimensionsBig;
+    // dbg_mean_of(pieces.size(), 4 + Big);
 #ifdef VECTOR
 
     // const bool odd = pieces...
