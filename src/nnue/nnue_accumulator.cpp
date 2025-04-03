@@ -308,41 +308,41 @@ void update_accumulator_incremental(
     else
         FeatureSet::append_changed_indices<Perspective>(ksq, computed.dirtyPiece, added, removed);
 
-        assert(added.size() == 1 || added.size() == 2);
-        assert(removed.size() == 1 || removed.size() == 2);
+    assert(added.size() == 1 || added.size() == 2);
+    assert(removed.size() == 1 || removed.size() == 2);
 
-        if (Forward)
-            assert(added.size() <= removed.size());
-        else
-            assert(removed.size() <= added.size());
+    if (Forward)
+        assert(added.size() <= removed.size());
+    else
+        assert(removed.size() <= added.size());
 
-        // Workaround compiler warning for uninitialized variables, replicated on
-        // profile builds on windows with gcc 14.2.0.
-        // TODO remove once unneeded
-        sf_assume(added.size() == 1 || added.size() == 2);
-        sf_assume(removed.size() == 1 || removed.size() == 2);
+    // Workaround compiler warning for uninitialized variables, replicated on
+    // profile builds on windows with gcc 14.2.0.
+    // TODO remove once unneeded
+    sf_assume(added.size() == 1 || added.size() == 2);
+    sf_assume(removed.size() == 1 || removed.size() == 2);
 
     auto updateContext =
       make_accumulator_update_context<Perspective>(featureTransformer, computed, target_state);
 
     if ((Forward && removed.size() == 1) || (Backward && added.size() == 1))
-        {
-            assert(added.size() == 1 && removed.size() == 1);
+    {
+        assert(added.size() == 1 && removed.size() == 1);
         updateContext.template apply<Add, Sub>(added[0], removed[0]);
-        }
-        else if (Forward && added.size() == 1)
-        {
-            assert(removed.size() == 2);
+    }
+    else if (Forward && added.size() == 1)
+    {
+        assert(removed.size() == 2);
         updateContext.template apply<Add, Sub, Sub>(added[0], removed[0], removed[1]);
-        }
+    }
     else if (Backward && removed.size() == 1)
-        {
-            assert(added.size() == 2);
+    {
+        assert(added.size() == 2);
         updateContext.template apply<Add, Add, Sub>(added[0], added[1], removed[0]);
-        }
-        else
-        {
-            assert(added.size() == 2 && removed.size() == 2);
+    }
+    else
+    {
+        assert(added.size() == 2 && removed.size() == 2);
         updateContext.template apply<Add, Add, Sub, Sub>(added[0], added[1], removed[0],
                                                          removed[1]);
     }
@@ -378,7 +378,7 @@ void update_accumulator_refresh_cache(
         {
             const Piece    piece    = make_piece(c, pt);
             const Bitboard oldBB    = entry.byColorBB[c] & entry.byTypeBB[pt];
-            Bitboard newBB    = pos.pieces(c, pt);
+            const Bitboard newBB    = pos.pieces(c, pt);
             Bitboard       toRemove = oldBB & ~newBB;
             Bitboard       toAdd    = newBB & ~oldBB;
 
@@ -453,7 +453,7 @@ void update_accumulator_refresh_cache(
             auto* columnA = reinterpret_cast<const vec_t*>(&featureTransformer.weights[offsetA]);
 
             for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-                acc[k] = vec_add_16(acc[k], vec_sub_16(columnA[k], columnR[k]));
+                acc[k] = fused<Vec16Wrapper, Add, Sub>(acc[k], columnA[k], columnR[k]);
         }
         if (combineLast3)
         {
@@ -472,8 +472,8 @@ void update_accumulator_refresh_cache(
                   reinterpret_cast<const vec_t*>(&featureTransformer.weights[offsetR2]);
 
                 for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-                    acc[k] = vec_sub_16(vec_add_16(acc[k], columnA[k]),
-                                        vec_add_16(columnR[k], columnR2[k]));
+                    acc[k] = fused<Vec16Wrapper, Add, Sub, Sub>(acc[k], columnA[k], columnR[k],
+                                                                columnR2[k]);
             }
             else
             {
@@ -483,8 +483,8 @@ void update_accumulator_refresh_cache(
                   reinterpret_cast<const vec_t*>(&featureTransformer.weights[offsetA2]);
 
                 for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-                    acc[k] = vec_add_16(vec_sub_16(acc[k], columnR[k]),
-                                        vec_add_16(columnA[k], columnA2[k]));
+                    acc[k] = fused<Vec16Wrapper, Add, Add, Sub>(acc[k], columnA[k], columnA2[k],
+                                                                columnR[k]);
             }
         }
         else
@@ -650,7 +650,7 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions, accPtr
             auto* column2 = reinterpret_cast<const vec_t*>(&featureTransformer.weights[offset2]);
 
             for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-                acc[k] = vec_add_16(acc[k], vec_add_16(column1[k], column2[k]));
+                acc[k] = fused<Vec16Wrapper, Add, Add>(acc[k], column1[k], column2[k]);
         }
 
         if constexpr (UpdateCache) {
