@@ -177,10 +177,9 @@ void AccumulatorStack::forward_update_incremental(
 
     const Square ksq = pos.square<KING>(Perspective);
 
-    int i = 0;
     for (std::size_t next = begin + 1; next < m_current_idx; next++)
     {
-        if (Dimensions == TransformedFeatureDimensionsBig && next + 1 < m_current_idx) {
+        if (next + 1 < m_current_idx) {
             auto dp1 = m_accumulators[next].dirtyPiece;
             auto dp2 = m_accumulators[next + 1].dirtyPiece;
             // dbg_hit_on(dp2.dirty_num == 2 && dp1.piece[0] == dp2.piece[1], 8);
