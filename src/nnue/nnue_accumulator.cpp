@@ -201,13 +201,13 @@ void AccumulatorStack::forward_update_incremental(
     //     ++i;
     // }
 
-    if (Dimensions == TransformedFeatureDimensionsBig)
-    {
-        dbg_mean_of(i, 1);
-        dbg_stdev_of(i, 1);
-        dbg_hit_on(i >= 2, 2);
-        dbg_hit_on(i >= 3, 3);
-    }
+    // if (Dimensions == TransformedFeatureDimensionsBig)
+    // {
+    //     dbg_mean_of(i, 1);
+    //     dbg_stdev_of(i, 1);
+    //     dbg_hit_on(i >= 2, 2);
+    //     dbg_hit_on(i >= 3, 3);
+    // }
 
     assert((latest().*accPtr).computed[Perspective]);
 }
@@ -231,13 +231,14 @@ void AccumulatorStack::backward_update_incremental(
             featureTransformer, ksq, m_accumulators[next], m_accumulators[next + 1]);
         ++i;
     }
-    if (Dimensions == TransformedFeatureDimensionsBig)
-    {
-        dbg_mean_of(i);
-        dbg_stdev_of(i);
-        dbg_hit_on(i >= 2);
-        dbg_hit_on(i >= 3, 1);
-    }
+
+    // if (Dimensions == TransformedFeatureDimensionsBig)
+    // {
+    //     dbg_mean_of(i);
+    //     dbg_stdev_of(i);
+    //     dbg_hit_on(i >= 2);
+    //     dbg_hit_on(i >= 3, 1);
+    // }
 
     assert((m_accumulators[end].*accPtr).computed[Perspective]);
 }
