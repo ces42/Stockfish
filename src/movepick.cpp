@@ -87,7 +87,8 @@ MovePicker::MovePicker(const Position&              p,
                        const CapturePieceToHistory* cph,
                        const PieceToHistory**       ch,
                        const PawnHistory*           ph,
-                       int                          pl) :
+                       int                          pl,
+                       Square                       lm) :
     pos(p),
     mainHistory(mh),
     lowPlyHistory(lph),
@@ -96,7 +97,8 @@ MovePicker::MovePicker(const Position&              p,
     pawnHistory(ph),
     ttMove(ttm),
     depth(d),
-    ply(pl) {
+    ply(pl),
+    last_moved(lm){
 
     if (pos.checkers())
         stage = EVASION_TT + !(ttm && pos.pseudo_legal(ttm));
@@ -147,7 +149,8 @@ void MovePicker::score() {
         if constexpr (Type == CAPTURES)
             m.value =
               7 * int(PieceValue[pos.piece_on(m.to_sq())])
-              + (*captureHistory)[pos.moved_piece(m)][m.to_sq()][type_of(pos.piece_on(m.to_sq()))];
+              + (*captureHistory)[pos.moved_piece(m)][m.to_sq()][type_of(pos.piece_on(m.to_sq()))]
+              - (m.from_sq() == last_moved) * 1024;
 
         else if constexpr (Type == QUIETS)
         {
@@ -179,6 +182,8 @@ void MovePicker::score() {
             m.value -= (pt == QUEEN && bool(to & threatenedByRook)   ? 49000
                         : pt == ROOK && bool(to & threatenedByMinor) ? 24335
                                                                      : 0);
+
+            m.value -= (m.from_sq() == last_moved) * 2048;
 
             if (ply < LOW_PLY_HISTORY_SIZE)
                 m.value += 8 * (*lowPlyHistory)[ply][m.from_to()] / (1 + 2 * ply);
