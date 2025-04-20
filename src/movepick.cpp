@@ -113,7 +113,8 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
     pos(p),
     captureHistory(cph),
     ttMove(ttm),
-    threshold(th) {
+    threshold(th),
+    last_moved(SQ_NONE) {
     assert(!pos.checkers());
 
     stage = PROBCUT_TT
@@ -150,7 +151,7 @@ void MovePicker::score() {
             m.value =
               7 * int(PieceValue[pos.piece_on(m.to_sq())])
               + (*captureHistory)[pos.moved_piece(m)][m.to_sq()][type_of(pos.piece_on(m.to_sq()))]
-              - (m.from_sq() == last_moved) * 1024;
+              - (m.from_sq() == last_moved) * 512;
 
         else if constexpr (Type == QUIETS)
         {
@@ -183,7 +184,7 @@ void MovePicker::score() {
                         : pt == ROOK && bool(to & threatenedByMinor) ? 24335
                                                                      : 0);
 
-            m.value -= (m.from_sq() == last_moved) * 2048;
+            m.value -= (from == last_moved) * 2048;
 
             if (ply < LOW_PLY_HISTORY_SIZE)
                 m.value += 8 * (*lowPlyHistory)[ply][m.from_to()] / (1 + 2 * ply);
