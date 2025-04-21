@@ -113,8 +113,7 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
     pos(p),
     captureHistory(cph),
     ttMove(ttm),
-    threshold(th),
-    last_moved(SQ_NONE) {
+    threshold(th) {
     assert(!pos.checkers());
 
     stage = PROBCUT_TT
