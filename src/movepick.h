@@ -79,6 +79,8 @@ class MovePicker {
     int                          ply;
     bool                         skipQuiets = false;
     ExtMove                      moves[MAX_MOVES];
+    Bitboard                    threatenedByPawn, threatenedByMinor, threatenedByRook;
+    Color                        us;
 };
 
 }  // namespace Stockfish

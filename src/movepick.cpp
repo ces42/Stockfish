@@ -126,28 +126,25 @@ void MovePicker::score() {
 
     static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong type");
 
-    [[maybe_unused]] Bitboard threatenedByPawn, threatenedByMinor, threatenedByRook,
-      threatenedPieces;
-    if constexpr (Type == QUIETS)
-    {
-        Color us = pos.side_to_move();
+    [[maybe_unused]] Bitboard threatenedPieces;
 
-        threatenedByPawn = pos.attacks_by<PAWN>(~us);
-        threatenedByMinor =
-          pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatenedByPawn;
-        threatenedByRook = pos.attacks_by<ROOK>(~us) | threatenedByMinor;
-
-        // Pieces threatened by pieces of lesser material value
-        threatenedPieces = (pos.pieces(us, QUEEN) & threatenedByRook)
-                         | (pos.pieces(us, ROOK) & threatenedByMinor)
-                         | (pos.pieces(us, KNIGHT, BISHOP) & threatenedByPawn);
-    }
+    // Pieces threatened by pieces of lesser material value
+    threatenedPieces = (pos.pieces(us, QUEEN) & threatenedByRook)
+                     | (pos.pieces(us, ROOK) & threatenedByMinor)
+                     | (pos.pieces(us, KNIGHT, BISHOP) & threatenedByPawn);
 
     for (auto& m : *this)
         if constexpr (Type == CAPTURES)
+        {
+            Piece     pc   = pos.moved_piece(m);
+            PieceType pt   = type_of(pc);
+            Square    to   = m.to_sq();
             m.value =
-              7 * int(PieceValue[pos.piece_on(m.to_sq())])
-              + (*captureHistory)[pos.moved_piece(m)][m.to_sq()][type_of(pos.piece_on(m.to_sq()))];
+                7 * int(PieceValue[pos.piece_on(m.to_sq())]
+                        - PieceValue[pt] * bool(to & threatenedByRook)
+                        )
+                + (*captureHistory)[pos.moved_piece(m)][m.to_sq()][type_of(pos.piece_on(m.to_sq()))];
+        }
 
         else if constexpr (Type == QUIETS)
         {
@@ -228,6 +225,13 @@ top:
     case CAPTURE_INIT :
     case PROBCUT_INIT :
     case QCAPTURE_INIT :
+        us = pos.side_to_move();
+
+        threatenedByPawn = pos.attacks_by<PAWN>(~us);
+        threatenedByMinor =
+          pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatenedByPawn;
+        threatenedByRook = pos.attacks_by<ROOK>(~us) | threatenedByMinor;
+
         cur = endBadCaptures = moves;
         endMoves             = generate<CAPTURES>(pos, cur);
 
