@@ -25,8 +25,13 @@
 #include "bitboard.h"
 #include "misc.h"
 #include "position.h"
+#include "tune.h"
 
 namespace Stockfish {
+
+int bonus[4] = {144, 144, 256, 517};
+int FACTOR = 95;
+TUNE(FACTOR, bonus);
 
 namespace {
 
@@ -173,10 +178,9 @@ void MovePicker::score() {
 
             // penalty for moving to a square threatened by a lesser piece
             // or bonus for escaping an attack by a lesser piece.
-            constexpr int bonus[4] = {144, 144, 256, 517};
             if (KNIGHT <= pt && pt <= QUEEN)
                 m.value += bonus[pt - 2] * (threat_by_lesser[pt - 2] & to
-                                            ? -95
+                                            ? -FACTOR
                                             : 100 * bool(threat_by_lesser[pt - 2] & from));
 
             if (ply < LOW_PLY_HISTORY_SIZE)
