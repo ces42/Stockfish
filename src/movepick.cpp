@@ -169,15 +169,15 @@ void MovePicker::score() {
             m.value += (*continuationHistory[5])[pc][to];
 
             // bonus for checks
-            m.value += (bool(pos.check_squares(pt) & to) && pos.see_ge(m, -75)) * 16384;
+            m.value += (bool(pos.check_squares(pt) & to) && pos.see_ge(m, -71)) * 16820;
 
             // penalty for moving to a square threatened by a lesser piece
             // or bonus for escaping an attack by a lesser piece.
-            constexpr int bonus[4] = {144, 144, 256, 517};
+            constexpr int bonus[4] = {127, 155, 246, 532};
             if (KNIGHT <= pt && pt <= QUEEN)
             {
                 auto i = pt - 2;
-                int  v = (threatByLesser[i] & to ? -95 : 100 * bool(threatByLesser[i] & from));
+                int  v = (threatByLesser[i] & to ? -93 : 100 * bool(threatByLesser[i] & from));
                 m.value += bonus[i] * v;
             }
 
