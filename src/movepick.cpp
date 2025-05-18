@@ -127,10 +127,10 @@ void MovePicker::score() {
     static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong type");
 
     [[maybe_unused]] Bitboard threatenedPieces, threatByLesser[QUEEN + 1];
+    [[maybe_unused]] int kingSafety;
+    Color us = pos.side_to_move();
     if constexpr (Type == QUIETS)
     {
-        Color us = pos.side_to_move();
-
         threatByLesser[KNIGHT] = threatByLesser[BISHOP] = pos.attacks_by<PAWN>(~us);
         threatByLesser[ROOK] =
           pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[KNIGHT];
@@ -140,6 +140,8 @@ void MovePicker::score() {
         threatenedPieces = (pos.pieces(us, QUEEN) & threatByLesser[QUEEN])
                          | (pos.pieces(us, ROOK) & threatByLesser[ROOK])
                          | (pos.pieces(us, KNIGHT, BISHOP) & threatByLesser[KNIGHT]);
+        Bitboard kingMask = attacks_bb<KING>(pos.square<KING>(us));
+        kingSafety = popcount(kingMask & pos.pieces(us)) + popcount(kingMask & ~pos.pieces(~us));
     }
 
     for (auto& m : *this)
@@ -175,6 +177,12 @@ void MovePicker::score() {
                 static constexpr int bonus[QUEEN + 1] = {0, 0, 144, 144, 256, 517};
                 int v = (threatByLesser[pt] & to ? -95 : 100 * bool(threatByLesser[pt] & from));
                 m.value += bonus[pt] * v;
+            }
+            if (pt == KING) {
+                // distance<Square>(pos.square<KING>(us), pos.square<QUEEN>(~us));
+                constexpr int FACTOR = 1024;
+                Bitboard newMask = attacks_bb<KING>(to);
+                m.value += FACTOR * (popcount(newMask & pos.pieces(us)) + popcount(newMask & ~pos.pieces(~us)) - kingSafety);
             }
 
             if (ply < LOW_PLY_HISTORY_SIZE)
