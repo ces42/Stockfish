@@ -178,7 +178,7 @@ void MovePicker::score() {
                 m.value += bonus[pt] * v;
             }
             if (pt == KING)
-                m.value += 4096 * popcount(pos.blockers_for_king(us));
+                m.value += 2048 * popcount(pos.blockers_for_king(us));
 
             if (ply < LOW_PLY_HISTORY_SIZE)
                 m.value += 8 * (*lowPlyHistory)[ply][m.from_to()] / (1 + ply);
