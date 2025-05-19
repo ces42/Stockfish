@@ -171,14 +171,15 @@ void MovePicker::score() {
 
             // penalty for moving to a square threatened by a lesser piece
             // or bonus for escaping an attack by a lesser piece.
-            if (KNIGHT <= pt && pt <= QUEEN)
+            if (KNIGHT <= pt)
             {
-                static constexpr int bonus[QUEEN + 1] = {0, 0, 144, 144, 256, 517};
-                int v = threatByLesser[pt] & to ? -95 : 100 * bool(threatByLesser[pt] & from);
-                m.value += bonus[pt] * v;
+                if (pt <= QUEEN) {
+                    static constexpr int bonus[QUEEN + 1] = {0, 0, 144, 144, 256, 517};
+                    int v = (threatByLesser[pt] & to ? -95 : 100 * bool(threatByLesser[pt] & from));
+                    m.value += bonus[pt] * v;
+                } else
+                    m.value += 8192 * popcount(pos.blockers_for_king(us));
             }
-            if (pt == KING)
-                m.value += 2048 * popcount(pos.blockers_for_king(us));
 
             if (ply < LOW_PLY_HISTORY_SIZE)
                 m.value += 8 * (*lowPlyHistory)[ply][m.from_to()] / (1 + ply);
