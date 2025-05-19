@@ -127,9 +127,10 @@ void MovePicker::score() {
     static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong type");
 
     [[maybe_unused]] Bitboard threatenedPieces, threatByLesser[QUEEN + 1];
-    Color us = pos.side_to_move();
+    [[maybe_unused]] Color us;
     if constexpr (Type == QUIETS)
     {
+        us = pos.side_to_move();
         threatByLesser[KNIGHT] = threatByLesser[BISHOP] = pos.attacks_by<PAWN>(~us);
         threatByLesser[ROOK] =
           pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[KNIGHT];
@@ -176,7 +177,7 @@ void MovePicker::score() {
                     int v = (threatByLesser[pt] & to ? -95 : 100 * bool(threatByLesser[pt] & from));
                     m.value += bonus[pt] * v;
                 } else
-                    m.value += 8192 * popcount(pos.blockers_for_king(us));
+                    m.value += 4096 * popcount(pos.blockers_for_king(us));
             }
 
             if (ply < LOW_PLY_HISTORY_SIZE)
