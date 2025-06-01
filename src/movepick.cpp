@@ -175,6 +175,8 @@ void MovePicker::score() {
                 static constexpr int bonus[QUEEN + 1] = {0, 0, 144, 144, 256, 517};
                 int v = threatByLesser[pt] & to ? -95 : 100 * bool(threatByLesser[pt] & from);
                 m.value += bonus[pt] * v;
+                if (from & pos.pinners(us))
+                    m.value -= 4096;
             }
 
             if (ply < LOW_PLY_HISTORY_SIZE)
