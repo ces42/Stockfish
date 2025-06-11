@@ -131,7 +131,12 @@ void MovePicker::score() {
     [[maybe_unused]] Bitboard threatByLesser[KING + 1];
     if constexpr (Type == QUIETS)
     {
-        threatByLesser[PAWN] = 0ULL;
+        Direction UpRight  = (us == WHITE ? NORTH_EAST : SOUTH_WEST);
+        Direction UpLeft   = (us == WHITE ? NORTH_WEST : SOUTH_EAST);
+        if (us == WHITE)
+            threatByLesser[PAWN] = ~(shift<NORTH_EAST>(pos.pieces(us, PAWN)) | shift<NORTH_WEST>(pos.pieces(us, PAWN)));
+        else
+            threatByLesser[PAWN] = ~(shift<SOUTH_EAST>(pos.pieces(us, PAWN)) | shift<SOUTH_WEST>(pos.pieces(us, PAWN)));
         threatByLesser[KNIGHT] = threatByLesser[BISHOP] = pos.attacks_by<PAWN>(~us);
         threatByLesser[ROOK] =
           pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[KNIGHT];
