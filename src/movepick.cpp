@@ -171,7 +171,7 @@ void MovePicker::score() {
 
             // penalty for moving to a square threatened by a lesser piece
             // or bonus for escaping an attack by a lesser piece.
-            static constexpr int bonus[KING + 1] = {0, 0, 144, 144, 256, 517, 10000};
+            static constexpr int bonus[KING + 1] = {0, 10, 144, 144, 256, 517, 10000};
             int v = threatByLesser[pt] & to ? -95 : 100 * bool(threatByLesser[pt] & from);
             m.value += bonus[pt] * v;
 
