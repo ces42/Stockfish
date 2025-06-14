@@ -25,6 +25,31 @@
 
 namespace Stockfish {
 
+enum Stages {
+    // generate main search moves
+    MAIN_TT,
+    CAPTURE_INIT,
+    GOOD_CAPTURE,
+    QUIET_INIT,
+    GOOD_QUIET,
+    BAD_CAPTURE,
+    BAD_QUIET,
+
+    // generate evasion moves
+    EVASION_TT,
+    EVASION_INIT,
+    EVASION,
+
+    // generate probcut moves
+    PROBCUT_TT,
+    PROBCUT_INIT,
+    PROBCUT,
+
+    // generate qsearch moves
+    QSEARCH_TT,
+    QCAPTURE_INIT,
+    QCAPTURE
+};
 class Position;
 
 // The MovePicker class is used to pick one pseudo-legal move at a time from the
@@ -41,6 +66,7 @@ class MovePicker {
     MovePicker(const Position&,
                Move,
                Depth,
+               Value,
                const ButterflyHistory*,
                const LowPlyHistory*,
                const CapturePieceToHistory*,
@@ -51,6 +77,7 @@ class MovePicker {
     Move next_move();
     void skip_quiet_moves();
     bool can_move_king_or_pawn() const;
+    int                          stage;
 
    private:
     template<typename Pred>
@@ -68,9 +95,9 @@ class MovePicker {
     const PawnHistory*           pawnHistory;
     Move                         ttMove;
     ExtMove *                    cur, *endCur, *endBadCaptures, *endBadQuiets;
-    int                          stage;
     int                          threshold;
     Depth                        depth;
+    Value                        staticEval;
     int                          ply;
     bool                         skipQuiets = false;
     ExtMove                      moves[MAX_MOVES];

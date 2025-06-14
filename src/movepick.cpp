@@ -23,6 +23,7 @@
 #include <utility>
 
 #include "bitboard.h"
+#include "evaluate.h"
 #include "misc.h"
 #include "position.h"
 
@@ -30,31 +31,6 @@ namespace Stockfish {
 
 namespace {
 
-enum Stages {
-    // generate main search moves
-    MAIN_TT,
-    CAPTURE_INIT,
-    GOOD_CAPTURE,
-    QUIET_INIT,
-    GOOD_QUIET,
-    BAD_CAPTURE,
-    BAD_QUIET,
-
-    // generate evasion moves
-    EVASION_TT,
-    EVASION_INIT,
-    EVASION,
-
-    // generate probcut moves
-    PROBCUT_TT,
-    PROBCUT_INIT,
-    PROBCUT,
-
-    // generate qsearch moves
-    QSEARCH_TT,
-    QCAPTURE_INIT,
-    QCAPTURE
-};
 
 // Sort moves in descending order up to and including a given limit.
 // The order of moves smaller than the limit is left unspecified.
@@ -82,6 +58,7 @@ void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
 MovePicker::MovePicker(const Position&              p,
                        Move                         ttm,
                        Depth                        d,
+                       Value                        se,
                        const ButterflyHistory*      mh,
                        const LowPlyHistory*         lph,
                        const CapturePieceToHistory* cph,
@@ -96,6 +73,7 @@ MovePicker::MovePicker(const Position&              p,
     pawnHistory(ph),
     ttMove(ttm),
     depth(d),
+    staticEval(se),
     ply(pl) {
 
     if (pos.checkers())
@@ -147,7 +125,7 @@ void MovePicker::score() {
 
         if constexpr (Type == CAPTURES)
             m.value = (*captureHistory)[pc][to][type_of(capturedPiece)]
-                    + 7 * int(PieceValue[capturedPiece]) + 1024 * bool(pos.check_squares(pt) & to);
+                    + (2070 - staticEval) / 256 * int(PieceValue[capturedPiece]) + 1024 * bool(pos.check_squares(pt) & to);
 
         else if constexpr (Type == QUIETS)
         {

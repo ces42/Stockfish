@@ -968,7 +968,7 @@ moves_loop:  // When in check, search starts here
       (ss - 4)->continuationHistory, (ss - 5)->continuationHistory, (ss - 6)->continuationHistory};
 
 
-    MovePicker mp(pos, ttData.move, depth, &thisThread->mainHistory, &thisThread->lowPlyHistory,
+    MovePicker mp(pos, ttData.move, depth, ss->staticEval, &thisThread->mainHistory, &thisThread->lowPlyHistory,
                   &thisThread->captureHistory, contHist, &thisThread->pawnHistory, ss->ply);
 
     value = bestValue;
@@ -1061,6 +1061,7 @@ moves_loop:  // When in check, search starts here
                       && PieceValue[movedPiece] >= RookValue
                       // it can't be stalemate if we moved a piece adjacent to the king
                       && !(attacks_bb<KING>(pos.square<KING>(us)) & move.from_sq())
+                      && mp.stage > GOOD_CAPTURE
                       && !mp.can_move_king_or_pawn();
 
                     // avoid pruning sacrifices of our last piece for stalemate
@@ -1617,7 +1618,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
     // Initialize a MovePicker object for the current position, and prepare to search
     // the moves. We presently use two stages of move generator in quiescence search:
     // captures, or evasions only when in check.
-    MovePicker mp(pos, ttData.move, DEPTH_QS, &thisThread->mainHistory, &thisThread->lowPlyHistory,
+    MovePicker mp(pos, ttData.move, DEPTH_QS, ss->staticEval, &thisThread->mainHistory, &thisThread->lowPlyHistory,
                   &thisThread->captureHistory, contHist, &thisThread->pawnHistory, ss->ply);
 
     // Step 5. Loop through all pseudo-legal moves until no moves remain or a beta
