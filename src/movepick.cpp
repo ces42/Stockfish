@@ -85,11 +85,12 @@ MovePicker::MovePicker(const Position&              p,
 
 // MovePicker constructor for ProbCut: we generate captures with Static Exchange
 // Evaluation (SEE) greater than or equal to the given threshold.
-MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceToHistory* cph) :
+MovePicker::MovePicker(const Position& p, Move ttm, int th, Value se, const CapturePieceToHistory* cph) :
     pos(p),
     captureHistory(cph),
     ttMove(ttm),
-    threshold(th) {
+    threshold(th),
+    staticEval(se) {
     assert(!pos.checkers());
 
     stage = PROBCUT_TT
