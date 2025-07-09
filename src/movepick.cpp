@@ -132,11 +132,11 @@ void MovePicker::score() {
     [[maybe_unused]] Bitboard threatByLesser[KING + 1];
     if constexpr (Type == QUIETS)
     {
-        threatByLesser[PAWN] = threatByLesser[KING] = 0;
+        threatByLesser[PAWN] = 0;
         threatByLesser[KNIGHT] = threatByLesser[BISHOP] = pos.attacks_by<PAWN>(~us);
         threatByLesser[ROOK] =
           pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[KNIGHT];
-        threatByLesser[QUEEN] = pos.attacks_by<ROOK>(~us) | threatByLesser[ROOK];
+        threatByLesser[QUEEN] = threatByLesser[KING] = pos.attacks_by<ROOK>(~us) | threatByLesser[ROOK];
     }
 
     for (auto& m : *this)
@@ -167,7 +167,7 @@ void MovePicker::score() {
 
             // penalty for moving to a square threatened by a lesser piece
             // or bonus for escaping an attack by a lesser piece.
-            static constexpr int bonus[QUEEN + 1] = {0, 0, 144, 144, 256, 517};
+            static constexpr int bonus[KING + 1] = {0, 0, 144, 144, 256, 517, 10000};
             int v = threatByLesser[pt] & to ? -95 : 100 * bool(threatByLesser[pt] & from);
             m.value += bonus[pt] * v;
 
