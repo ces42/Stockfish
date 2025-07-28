@@ -529,6 +529,7 @@ void Search::Worker::do_move(
     if (ss != nullptr)
     {
         ss->currentMove         = move;
+        ss->currentMovePc       = pos.piece_on(move.from_sq());
         ss->continuationHistory = &continuationHistory[ss->inCheck][capture][dp.pc][move.to_sq()];
         ss->continuationCorrectionHistory = &continuationCorrectionHistory[dp.pc][move.to_sq()];
     }
@@ -812,7 +813,13 @@ Value Search::Worker::search(
     if (((ss - 1)->currentMove).is_ok() && !(ss - 1)->inCheck && !priorCapture)
     {
         int bonus = std::clamp(-10 * int((ss - 1)->staticEval + ss->staticEval), -1979, 1561) + 630;
-        mainHistory[~us][((ss - 1)->currentMove).from_to()] << bonus * 935 / 1024;
+
+        assert(prevSq != SQ_NONE);
+        Piece last_pc = pos.piece_on(prevSq); // this will be wrong in case of promotion
+        // dbg_hit_on(last_pc == NO_PIECE);
+        assert(last_pc == NO_PIECE || color_of(last_pc) == ~us);
+        mainHistory[last_pc][((ss - 1)->currentMove).from_to()] << bonus * 935 / 1024;
+
         if (type_of(pos.piece_on(prevSq)) != PAWN && ((ss - 1)->currentMove).type_of() != PROMOTION)
             pawnHistory[pawn_structure_index(pos)][pos.piece_on(prevSq)][prevSq]
               << bonus * 1428 / 1024;
@@ -865,6 +872,7 @@ Value Search::Worker::search(
         Depth R = 7 + depth / 3;
 
         ss->currentMove                   = Move::null();
+        ss->currentMovePc                 = NO_PIECE;
         ss->continuationHistory           = &continuationHistory[0][0][NO_PIECE][0];
         ss->continuationCorrectionHistory = &continuationCorrectionHistory[NO_PIECE][0];
 
@@ -929,7 +937,26 @@ Value Search::Worker::search(
 
             movedPiece = pos.moved_piece(move);
 
+<<<<<<< HEAD
             do_move(pos, move, st, ss);
+||||||| parent of a68a1fca (Index main history (aka butterfly history) by piece instead of just color)
+            do_move(pos, move, st);
+
+            ss->currentMove = move;
+            ss->continuationHistory =
+              &continuationHistory[ss->inCheck][true][movedPiece][move.to_sq()];
+            ss->continuationCorrectionHistory =
+              &continuationCorrectionHistory[movedPiece][move.to_sq()];
+=======
+            do_move(pos, move, st);
+
+            ss->currentMove = move;
+            ss->currentMovePc = movedPiece;
+            ss->continuationHistory =
+              &continuationHistory[ss->inCheck][true][movedPiece][move.to_sq()];
+            ss->continuationCorrectionHistory =
+              &continuationCorrectionHistory[movedPiece][move.to_sq()];
+>>>>>>> a68a1fca (Index main history (aka butterfly history) by piece instead of just color)
 
             // Perform a preliminary qsearch to verify that the move holds
             value = -qsearch<NonPV>(pos, ss + 1, -probCutBeta, -probCutBeta + 1);
@@ -1074,7 +1101,7 @@ moves_loop:  // When in check, search starts here
                 if (history < -4361 * depth)
                     continue;
 
-                history += 71 * mainHistory[us][move.from_to()] / 32;
+                history += 71 * mainHistory[movedPiece][move.from_to()] / 32;
 
                 lmrDepth += history / 3233;
 
@@ -1204,7 +1231,7 @@ moves_loop:  // When in check, search starts here
             ss->statScore = 782 * int(PieceValue[pos.captured_piece()]) / 128
                           + captureHistory[movedPiece][move.to_sq()][type_of(pos.captured_piece())];
         else
-            ss->statScore = 2 * mainHistory[us][move.from_to()]
+            ss->statScore = 2 * mainHistory[movedPiece][move.from_to()]
                           + (*contHist[0])[movedPiece][move.to_sq()]
                           + (*contHist[1])[movedPiece][move.to_sq()];
 
@@ -1419,7 +1446,10 @@ moves_loop:  // When in check, search starts here
         update_continuation_histories(ss - 1, pos.piece_on(prevSq), prevSq,
                                       scaledBonus * 397 / 32768);
 
-        mainHistory[~us][((ss - 1)->currentMove).from_to()] << scaledBonus * 224 / 32768;
+        Piece last_pc = pos.piece_on(prevSq);
+        // dbg_hit_on(last_pc == NO_PIECE, 2);
+        assert(last_pc == NO_PIECE || color_of(last_pc) == ~us);
+        mainHistory[~last_pc][((ss - 1)->currentMove).from_to()] << scaledBonus * 224 / 32768;
 
         if (type_of(pos.piece_on(prevSq)) != PAWN && ((ss - 1)->currentMove).type_of() != PROMOTION)
             pawnHistory[pawn_structure_index(pos)][pos.piece_on(prevSq)][prevSq]
@@ -1870,7 +1900,8 @@ void update_quiet_histories(
   const Position& pos, Stack* ss, Search::Worker& workerThread, Move move, int bonus) {
 
     Color us = pos.side_to_move();
-    workerThread.mainHistory[us][move.from_to()] << bonus;  // Untuned to prevent duplicate effort
+    Piece movedPiece = pos.piece_on(move.from_sq());
+    workerThread.mainHistory[movedPiece][move.from_to()] << bonus;  // Untuned to prevent duplicate effort
 
     if (ss->ply < LOW_PLY_HISTORY_SIZE)
         workerThread.lowPlyHistory[ss->ply][move.from_to()] << (bonus * 771 / 1024) + 40;
