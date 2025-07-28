@@ -530,7 +530,7 @@ void Search::Worker::do_move(
     if (ss != nullptr)
     {
         ss->currentMove         = move;
-        ss->currentMovePc       = pos.piece_on(move.from_sq());
+        ss->currentMovePc       = dp.pc;
         ss->continuationHistory = &continuationHistory[ss->inCheck][capture][dp.pc][move.to_sq()];
         ss->continuationCorrectionHistory = &continuationCorrectionHistory[dp.pc][move.to_sq()];
     }
@@ -815,7 +815,6 @@ Value Search::Worker::search(
     if (((ss - 1)->currentMove).is_ok() && !(ss - 1)->inCheck && !priorCapture)
     {
         int bonus = std::clamp(-10 * int((ss - 1)->staticEval + ss->staticEval), -1979, 1561) + 630;
-
         mainHistory[prevPc][((ss - 1)->currentMove).from_to()] << bonus * 935 / 1024;
 
         if (type_of(prevPc) != PAWN && ((ss - 1)->currentMove).type_of() != PROMOTION)
@@ -1877,18 +1876,17 @@ void update_continuation_histories(Stack* ss, Piece pc, Square to, int bonus) {
 void update_quiet_histories(
   const Position& pos, Stack* ss, Search::Worker& workerThread, Move move, int bonus) {
 
-    Color us = pos.side_to_move();
-    Piece movedPiece = pos.piece_on(move.from_sq());
+    Piece movedPiece = pos.moved_piece(move);
     workerThread.mainHistory[movedPiece][move.from_to()] << bonus;  // Untuned to prevent duplicate effort
 
     if (ss->ply < LOW_PLY_HISTORY_SIZE)
         workerThread.lowPlyHistory[ss->ply][move.from_to()] << (bonus * 771 / 1024) + 40;
 
-    update_continuation_histories(ss, pos.moved_piece(move), move.to_sq(),
+    update_continuation_histories(ss, movedPiece, move.to_sq(),
                                   bonus * (bonus > 0 ? 979 : 842) / 1024);
 
     int pIndex = pawn_structure_index(pos);
-    workerThread.pawnHistory[pIndex][pos.moved_piece(move)][move.to_sq()]
+    workerThread.pawnHistory[pIndex][movedPiece][move.to_sq()]
       << (bonus * (bonus > 0 ? 704 : 439) / 1024) + 70;
 }
 
