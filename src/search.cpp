@@ -867,7 +867,7 @@ Value Search::Worker::search(
         int bonus = std::clamp(-10 * int((ss - 1)->staticEval + ss->staticEval), -1979, 1561) + 630;
         mainHistory[prevPc][((ss - 1)->currentMove).from_to()] << bonus * 935 / 1024;
 
-        if (type_of(prevPc) != PAWN && ((ss - 1)->currentMove).type_of() != PROMOTION)
+        if (type_of(prevPc) != PAWN)
             pawnHistory[pawn_structure_index(pos)][prevPc][prevSq]
               << bonus * 1428 / 1024;
     }
