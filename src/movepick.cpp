@@ -39,6 +39,7 @@ enum Stages {
     GOOD_QUIET,
     BAD_CAPTURE,
     BAD_QUIET,
+    DONE,
 
     // generate evasion moves
     EVASION_TT,
@@ -250,9 +251,7 @@ top:
         ++stage;
         [[fallthrough]];
 
-    case QUIET_INIT :
-        if (!skipQuiets)
-        {
+    case QUIET_INIT : {
             MoveList<QUIETS> ml(pos);
 
             endCur = endGenerated = score<QUIETS>(ml);
@@ -264,7 +263,7 @@ top:
         [[fallthrough]];
 
     case GOOD_QUIET :
-        if (!skipQuiets && select([&]() { return cur->value > goodQuietThreshold; }))
+        if (select([&]() { return cur->value > goodQuietThreshold; }))
             return *(cur - 1);
 
         // Prepare the pointers to loop over the bad captures
@@ -282,13 +281,17 @@ top:
         cur    = endCaptures;
         endCur = endGenerated;
 
-        ++stage;
+        // dbg_hit_on(skipQuiets, 3);
+        if (!skipQuiets)
+        {
+            ++stage;
+            [[fallthrough]];
+    case BAD_QUIET :
+                return select([&]() { return cur->value <= goodQuietThreshold; });
+        }
         [[fallthrough]];
 
-    case BAD_QUIET :
-        if (!skipQuiets)
-            return select([&]() { return cur->value <= goodQuietThreshold; });
-
+    case DONE:
         return Move::none();
 
     case EVASION_INIT : {
@@ -314,7 +317,11 @@ top:
     return Move::none();  // Silence warning
 }
 
-void MovePicker::skip_quiet_moves() { skipQuiets = true; }
+void MovePicker::skip_bad_quiet_moves() {
+    skipQuiets = true;
+    if (stage == BAD_QUIET)
+        stage = DONE;
+}
 
 // this function must be called after all quiet moves and captures have been generated
 bool MovePicker::can_move_king_or_pawn() const {

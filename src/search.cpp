@@ -1027,8 +1027,9 @@ moves_loop:  // When in check, search starts here
         if (!rootNode && pos.non_pawn_material(us) && !is_loss(bestValue))
         {
             // Skip quiet moves if movecount exceeds our FutilityMoveCount threshold
+            // dbg_hit_on(moveCount >= (3 + depth * depth) / (2 - improving), 1);
             if (moveCount >= (3 + depth * depth) / (2 - improving))
-                mp.skip_quiet_moves();
+                mp.skip_bad_quiet_moves();
 
             // Reduced depth of the next LMR search
             int lmrDepth = newDepth - r / 1024;

@@ -49,7 +49,7 @@ class MovePicker {
                int);
     MovePicker(const Position&, Move, int, const CapturePieceToHistory*);
     Move next_move();
-    void skip_quiet_moves();
+    void skip_bad_quiet_moves();
     bool can_move_king_or_pawn() const;
 
    private:
