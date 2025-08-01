@@ -545,10 +545,60 @@ void Search::Worker::undo_move(Position& pos, const Move move) {
 
 void Search::Worker::undo_null_move(Position& pos) { pos.undo_null_move(); }
 
+#define S(a, b) a
+
+constexpr int PSQT[PIECE_NB][RANK_NB][int(FILE_NB) / 2] = {
+    { },
+    { },
+    { // Knight
+        { -175, -92, -74, -73 },
+        { -77, -41, -27, -15 },
+        { -61, -17, 6, 12 },
+        { -35, 8, 40, 49 },
+        { -34, 13, 44, 51 },
+        { -9, 22, 58, 53 },
+        { -67, -27, 4, 37 },
+        { -201, -83, -56, -26 }
+    },
+    { },
+    { },
+    { },
+    { // King
+        { 271, 327, 271, 198 },
+        { 278, 303, 234, 179 },
+        { 195, 258, 169, 120 },
+        { 164, 190, 138, 98 },
+        { 154, 179, 105, 70 },
+        { 123, 145, 81, 31 },
+        { 88, 120, 65, 33 },
+        { 59, 89, 45, -1 }
+    }
+};
 
 // Reset histories, usually before a new game
 void Search::Worker::clear() {
     mainHistory.fill(64);
+
+    for (PieceType pt : {KNIGHT, KING})
+        for (Square from = SQ_A1; from <= SQ_H8; ++from)
+        {
+            int from_rank = from >> 3;
+            int from_file = int(from) & 7;
+            from_file = from_file ^ 7 * (from_file >> 2);
+            assert(from_file < 4);
+            Bitboard movs = PseudoAttacks[pt][from];
+            while (movs) {
+                int to = pop_lsb(movs);
+                int to_rank = to >> 3;
+                int to_file = to & 7;
+                to_file = to_file ^ 7 * (to_file >> 2);
+                int from_to = from * 64 + to;
+                int delta = PSQT[pt][to_rank][to_file] - PSQT[pt][from_rank][from_file];
+                mainHistory[pt].data()[from_to] = 64 + 5 * delta;
+                mainHistory[pt + 8].data()[from_to ^ 0b111000111000] = 64 + 5 * delta;
+            }
+        }
+
     captureHistory.fill(-753);
     pawnHistory.fill(-1275);
     pawnCorrectionHistory.fill(5);
