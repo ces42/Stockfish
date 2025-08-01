@@ -547,21 +547,18 @@ void Search::Worker::undo_null_move(Position& pos) { pos.undo_null_move(); }
 
 
 int knightPSQT[RANK_NB][int(FILE_NB) / 2] = {
-    { -175, -92, -74, -73 },
-    { -77, -41, -27, -15 },
-    { -61, -17, 6, 12 },
-    { -35, 8, 40, 49 },
-    { -34, 13, 44, 51 },
-    { -9, 22, 58, 53 },
-    { -67, -27, 4, 37 },
-    { -201, -83, -56, -26 }
+    { -183, -76, -66, -73, },
+    { -60, -54, -43, -15, } ,
+    { -50, -3,  -11, 13,  } ,
+    { -24, 1,   33,  47,  } ,
+    { -29, 8,   27,  42,  } ,
+    { -2,  14,  68,  48,  } ,
+    { -62, -17, 8,   43,  } ,
+    { -186, -93, -51, -22, },
 };
 
 int mh0 = 64;
-TUNE(mh0);
-int psqtW = 320;
-TUNE(psqtW);
-TUNE(SetRange(-300, 200), knightPSQT);
+int psqtW = 349;
 
 // Reset histories, usually before a new game
 void Search::Worker::clear() {
@@ -611,11 +608,10 @@ void Search::Worker::clear() {
     refreshTable.clear(networks[numaAccessToken]);
 }
 
-int offs[KING + 1] = {630, 630, 630, 630, 630, 630, 630};
-int mh_mult = 935;
-int bonus_mult = 224;
-int mh_weight = 71;
-TUNE(offs, mh_mult, bonus_mult, mh_weight);
+int offs[KING + 1] = {651, 597, 629, 652, 626, 677, 613};
+int mh_mult = 883;
+int bonus_mult = 242;
+int mh_weight = 58;
 
 
 // Main search function for both PV and non-PV nodes
