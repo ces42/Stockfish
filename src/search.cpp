@@ -545,9 +545,8 @@ void Search::Worker::undo_move(Position& pos, const Move move) {
 
 void Search::Worker::undo_null_move(Position& pos) { pos.undo_null_move(); }
 
-#define S(a, b) a
 
-constexpr int PSQT[PIECE_NB][RANK_NB][int(FILE_NB) / 2] = {
+const int PSQT[PIECE_NB][RANK_NB][int(FILE_NB) / 2] = {
     { },
     { },
     { // Knight
@@ -575,9 +574,14 @@ constexpr int PSQT[PIECE_NB][RANK_NB][int(FILE_NB) / 2] = {
     }
 };
 
+int mh0 = 64;
+TUNE(mh0);
+int psqtW = 320;
+TUNE(psqtW);
+
 // Reset histories, usually before a new game
 void Search::Worker::clear() {
-    mainHistory.fill(64);
+    mainHistory.fill(mh0);
 
     for (PieceType pt : {KNIGHT, KING})
         for (Square from = SQ_A1; from <= SQ_H8; ++from)
@@ -594,8 +598,9 @@ void Search::Worker::clear() {
                 to_file = to_file ^ 7 * (to_file >> 2);
                 int from_to = from * 64 + to;
                 int delta = PSQT[pt][to_rank][to_file] - PSQT[pt][from_rank][from_file];
-                mainHistory[pt].data()[from_to] = 64 + 5 * delta;
-                mainHistory[pt + 8].data()[from_to ^ 0b111000111000] = 64 + 5 * delta;
+                mainHistory[pt].data()[from_to]
+                    = mainHistory[pt + 8].data()[from_to ^ 0b111000111000]
+                    = mh0 + psqtW * delta / 64;
             }
         }
 
@@ -622,6 +627,12 @@ void Search::Worker::clear() {
 
     refreshTable.clear(networks[numaAccessToken]);
 }
+
+int offs[KING + 1] = {630, 630, 630, 630, 630, 630, 630};
+int mh_mult = 935;
+int bonus_mult = 224;
+int mh_weight = 71;
+TUNE(offs, mh_mult, bonus_mult, mh_weight);
 
 
 // Main search function for both PV and non-PV nodes
@@ -864,8 +875,8 @@ Value Search::Worker::search(
     // Use static evaluation difference to improve quiet move ordering
     if (((ss - 1)->currentMove).is_ok() && !(ss - 1)->inCheck && !priorCapture)
     {
-        int bonus = std::clamp(-10 * int((ss - 1)->staticEval + ss->staticEval), -1979, 1561) + 630;
-        mainHistory[prevPc][((ss - 1)->currentMove).from_to()] << bonus * 935 / 1024;
+        int bonus = std::clamp(-10 * int((ss - 1)->staticEval + ss->staticEval), -1979, 1561) + offs[type_of(prevPc)];
+        mainHistory[prevPc][((ss - 1)->currentMove).from_to()] << bonus * mh_mult / 1024;
 
         if (type_of(prevPc) != PAWN)
             pawnHistory[pawn_structure_index(pos)][prevPc][prevSq]
@@ -1129,7 +1140,7 @@ moves_loop:  // When in check, search starts here
                 if (history < -4361 * depth)
                     continue;
 
-                history += 71 * mainHistory[movedPiece][move.from_to()] / 32;
+                history += mh_weight * mainHistory[movedPiece][move.from_to()] / 32;
 
                 lmrDepth += history / 3233;
 
@@ -1475,7 +1486,7 @@ moves_loop:  // When in check, search starts here
                                       scaledBonus * 397 / 32768);
 
         assert(prevPc == NO_PIECE || color_of(prevPc) == ~us);
-        mainHistory[prevPc][((ss - 1)->currentMove).from_to()] << scaledBonus * 224 / 32768;
+        mainHistory[prevPc][((ss - 1)->currentMove).from_to()] << scaledBonus * bonus_mult / 32768;
 
         if (type_of(prevPc) != PAWN && ((ss - 1)->currentMove).type_of() != PROMOTION)
             pawnHistory[pawn_structure_index(pos)][prevPc][prevSq]
