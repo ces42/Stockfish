@@ -544,43 +544,12 @@ void Search::Worker::undo_move(Position& pos, const Move move) {
 void Search::Worker::undo_null_move(Position& pos) { pos.undo_null_move(); }
 
 
-constexpr int knightPSQT[RANK_NB][int(FILE_NB) / 2] = {
-    { -161, -107, -79, -79 },
-    { -32, -57, -40, -6 },
-    { -60, -1, -8, 2 },
-    { -26, -7, 29, 22 },
-    { -33, 0, 30, 38 },
-    { -6, 15, 81, 40 },
-    { -55, 3, 19, 56 },
-    { -188, -83, -47, -35 },
-};
-
 constexpr int mh0 = 65;
 constexpr int psqtW = 332;
 
 // Reset histories, usually before a new game
 void Search::Worker::clear() {
     mainHistory.fill(mh0);
-
-    for (Square from = SQ_A1; from <= SQ_H8; ++from)
-    {
-        int from_rank = from >> 3;
-        int from_file = int(from) & 7;
-        from_file = from_file ^ 7 * (from_file >> 2);
-        assert(from_file < 4);
-        Bitboard movs = PseudoAttacks[KNIGHT][from];
-        while (movs) {
-            int to = pop_lsb(movs);
-            int to_rank = to >> 3;
-            int to_file = to & 7;
-            to_file = to_file ^ 7 * (to_file >> 2);
-            int from_to = from * 64 + to;
-            int delta = knightPSQT[to_rank][to_file] - knightPSQT[from_rank][from_file];
-            mainHistory.data()[W_KNIGHT][from_to]
-                = mainHistory[B_KNIGHT].data()[from_to ^ 0b111000111000]
-                = mh0 + psqtW * delta / 64;
-        }
-    }
 
     captureHistory.fill(-753);
     pawnHistory.fill(-1275);
