@@ -544,8 +544,7 @@ void Search::Worker::undo_move(Position& pos, const Move move) {
 void Search::Worker::undo_null_move(Position& pos) { pos.undo_null_move(); }
 
 
-int mh0 = 65;
-TUNE(mh0);
+int mh0 = 62;
 
 // Reset histories, usually before a new game
 void Search::Worker::clear() {
@@ -575,10 +574,10 @@ void Search::Worker::clear() {
     refreshTable.clear(networks[numaAccessToken]);
 }
 
-int offs[KING + 1] = {0, 522, 668, 657, 622, 677, 599};
-int mh_mult[KING + 1] = {0, 951, 951, 951, 951, 951, 951};
-int bonus_mult[KING + 1] = {0, 264, 264, 264, 264, 264, 264};
-int mh_weight = 57;
+int offs[KING + 1] = {0, 501, 640, 664, 609, 689, 610};
+int mh_mult = 940;
+int bonus_mult = 263;
+int mh_weight = 60;
 
 TUNE(offs, mh_mult, bonus_mult, mh_weight);
 
@@ -824,7 +823,7 @@ Value Search::Worker::search(
     if (((ss - 1)->currentMove).is_ok() && !(ss - 1)->inCheck && !priorCapture)
     {
         int bonus = std::clamp(-10 * int((ss - 1)->staticEval + ss->staticEval), -1979, 1561) + offs[type_of(prevPc)];
-        mainHistory[prevPc][((ss - 1)->currentMove).from_to()] << bonus * mh_mult[type_of(prevPc)] / 1024;
+        mainHistory[prevPc][((ss - 1)->currentMove).from_to()] << bonus * mh_mult / 1024;
 
         if (!ttHit && type_of(prevPc) != PAWN)
             pawnHistory[pawn_history_index(pos)][prevPc][prevSq]
@@ -1438,7 +1437,7 @@ moves_loop:  // When in check, search starts here
                                       scaledBonus * 397 / 32768);
 
         assert(prevPc == NO_PIECE || color_of(prevPc) == ~us);
-        mainHistory[prevPc][((ss - 1)->currentMove).from_to()] << scaledBonus * bonus_mult[type_of(prevPc)] / 32768;
+        mainHistory[prevPc][((ss - 1)->currentMove).from_to()] << scaledBonus * bonus_mult / 32768;
 
         if (type_of(prevPc) != PAWN)
             pawnHistory[pawn_history_index(pos)][prevPc][prevSq]
