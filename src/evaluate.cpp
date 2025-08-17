@@ -46,9 +46,9 @@ int Eval::simple_eval(const Position& pos) {
          + (pos.non_pawn_material(c) - pos.non_pawn_material(~c));
 }
 
-bool Eval::use_smallnet(const Position& pos, bool last_small) {
+bool Eval::use_smallnet(const Position& pos, bool last_big) {
     // return std::abs(simple_eval(pos)) > 962;
-    return std::abs(simple_eval(pos)) > 980 - 150 * last_small;
+    return std::abs(simple_eval(pos)) > 830 + 150 * last_big;
 }
 
 // Evaluate is the evaluator for the outer world. It returns a static evaluation
@@ -61,10 +61,10 @@ Value Eval::evaluate(const Eval::NNUE::Networks&    networks,
 
     assert(!pos.checkers());
 
-    bool last_small = accumulators.size > 1
-        && accumulators.accumulators[accumulators.size - 2].accumulatorSmall.computed[BLACK]
-        && accumulators.accumulators[accumulators.size - 2].accumulatorSmall.computed[WHITE];
-    bool smallNet           = use_smallnet(pos, last_small);
+    bool last_big = accumulators.size > 1
+        && accumulators.accumulators[accumulators.size - 2].accumulatorBig.computed[BLACK]
+        && accumulators.accumulators[accumulators.size - 2].accumulatorBig.computed[WHITE];
+    bool smallNet           = use_smallnet(pos, last_big);
     auto [psqt, positional] = smallNet ? networks.small.evaluate(pos, accumulators, &caches.small)
                                        : networks.big.evaluate(pos, accumulators, &caches.big);
 
