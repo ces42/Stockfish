@@ -28,7 +28,6 @@
 #include <sstream>
 #include <tuple>
 
-#include "misc.h"
 #include "nnue/network.h"
 #include "nnue/nnue_misc.h"
 #include "position.h"
@@ -47,14 +46,10 @@ int Eval::simple_eval(const Position& pos) {
          + (pos.non_pawn_material(c) - pos.non_pawn_material(~c));
 }
 
-bool Eval::use_smallnet(const Position& pos, bool last_big) {
-    // int center_kings = (rank_of(pos.square<KING>(WHITE)) >= 2) + (rank_of(pos.square<KING>(BLACK)) <= 5);
-    // dbg_mean_of(pos.count<ALL_PIECES>(), 5);
-    // dbg_mean_of(popcount(pos.pinners(BLACK) | pos.pinners(WHITE)), 6);
-    return std::abs(simple_eval(pos)) > 900 + 80 * last_big;
+bool Eval::use_smallnet(const Position& pos, bool last_small) {
+    // return std::abs(simple_eval(pos)) > 962;
+    return std::abs(simple_eval(pos)) > 980 - 150 * last_small;
 }
-
-# define DEV(num, id) dbg_mean_of((num) * (num) / 1000, (id))
 
 // Evaluate is the evaluator for the outer world. It returns a static evaluation
 // of the position from the point of view of the side to move.
@@ -66,54 +61,23 @@ Value Eval::evaluate(const Eval::NNUE::Networks&    networks,
 
     assert(!pos.checkers());
 
-    bool last_big = accumulators.size > 1
-        && accumulators.accumulators[accumulators.size - 2].accumulatorBig.computed[BLACK]
-        && accumulators.accumulators[accumulators.size - 2].accumulatorBig.computed[WHITE];
-    bool smallNet           = use_smallnet(pos, last_big);
+    bool last_small = accumulators.size > 1
+        && accumulators.accumulators[accumulators.size - 2].accumulatorSmall.computed[BLACK]
+        && accumulators.accumulators[accumulators.size - 2].accumulatorSmall.computed[WHITE];
+    bool smallNet           = use_smallnet(pos, last_small);
     auto [psqt, positional] = smallNet ? networks.small.evaluate(pos, accumulators, &caches.small)
                                        : networks.big.evaluate(pos, accumulators, &caches.big);
 
     Value nnue = (125 * psqt + 131 * positional) / 128;
-    Value nnue_big, nnue_small = nnue;
 
     // Re-evaluate the position when higher eval accuracy is worth the time spent
-    // dbg_hit_on(smallNet && (std::abs(nnue) < 236), 1);
     if (smallNet && (std::abs(nnue) < 236))
     {
         std::tie(psqt, positional) = networks.big.evaluate(pos, accumulators, &caches.big);
         nnue                       = (125 * psqt + 131 * positional) / 128;
         smallNet                   = false;
-        nnue_big = nnue;
-        // DEV(nnue - nnue_small, 0);
     }
-    // else if (smallNet) {
-    //     auto [psqt_big, positional_big] = networks.big.evaluate(pos, accumulators, &caches.big);
-    //     nnue_big = (125 * psqt_big + 131 * positional_big) / 128;
-    //     DEV(nnue_big - nnue, 1);
-    // } else {
-    //     nnue_big = nnue;
-    //     auto [psqt_small, positional_small] = networks.small.evaluate(pos, accumulators, &caches.small);
-    //     nnue_small = (125 * psqt_small + 131 * positional_small) / 128;
-    //     // DEV(nnue - nnue_small, 0);
-    // }
     // dbg_hit_on(smallNet);
-    // int diff = std::abs(nnue_big - nnue_small);
-    // int diff_rm = diff - int(0.090037 * std::abs(simple_eval(pos)));
-    // dbg_correl_of(std::abs(nnue), diff, 8);
-    // dbg_correl_of(std::abs(nnue), diff_rm, 7);
-    //
-    // dbg_correl_of(std::abs(simple_eval(pos)), diff, 0);
-    // dbg_correl_of(std::abs(simple_eval(pos)), diff_rm, 9);
-    //
-    // dbg_correl_of( pos.count<ALL_PIECES>(), diff_rm, 1);
-    // dbg_correl_of( pos.count<PAWN>(), diff_rm, 2);
-    // dbg_correl_of( pos.count<KNIGHT>(), diff_rm, 3);
-    // dbg_correl_of( pos.count<QUEEN>(), diff_rm, 4);
-    // dbg_correl_of( popcount(pos.blockers_for_king(WHITE) | pos.blockers_for_king(BLACK)), diff_rm, 5);
-    // dbg_correl_of(
-    //     (rank_of(pos.square<KING>(WHITE)) >= 2) + (rank_of(pos.square<KING>(BLACK)) <= 5),
-    //     diff_rm,
-    //     6);
 
     // Blend optimism and eval with nnue complexity
     int nnueComplexity = std::abs(psqt - positional);
