@@ -157,7 +157,6 @@ class AccumulatorStack {
                   const FeatureTransformer<Dimensions>& featureTransformer,
                   AccumulatorCaches::Cache<Dimensions>& cache) noexcept;
 
-   private:
     [[nodiscard]] AccumulatorState& mut_latest() noexcept;
 
     template<Color Perspective, IndexType Dimensions>

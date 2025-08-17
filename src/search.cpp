@@ -1739,8 +1739,10 @@ TimePoint Search::Worker::elapsed() const {
 TimePoint Search::Worker::elapsed_time() const { return main_manager()->tm.elapsed_time(); }
 
 Value Search::Worker::evaluate(const Position& pos) {
-    return Eval::evaluate(networks[numaAccessToken], pos, accumulatorStack, refreshTable,
+    Value ev = Eval::evaluate(networks[numaAccessToken], pos, accumulatorStack, refreshTable,
                           optimism[pos.side_to_move()]);
+    // dbg_hit_on(ev > 962 && Eval::simple_eval(pos) < 962, 5);
+    return ev;
 }
 
 namespace {
