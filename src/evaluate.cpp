@@ -48,7 +48,7 @@ int Eval::simple_eval(const Position& pos) {
 
 bool Eval::use_smallnet(const Position& pos, bool last_big) {
     // return std::abs(simple_eval(pos)) > 962;
-    return std::abs(simple_eval(pos)) > 900 + 150 * last_big;
+    return std::abs(simple_eval(pos)) > 950 + 80 * last_big;
 }
 
 // Evaluate is the evaluator for the outer world. It returns a static evaluation
@@ -77,7 +77,7 @@ Value Eval::evaluate(const Eval::NNUE::Networks&    networks,
         nnue                       = (125 * psqt + 131 * positional) / 128;
         smallNet                   = false;
     }
-    // dbg_hit_on(smallNet);
+    dbg_hit_on(smallNet);
 
     // Blend optimism and eval with nnue complexity
     int nnueComplexity = std::abs(psqt - positional);
