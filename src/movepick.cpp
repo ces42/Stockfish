@@ -25,6 +25,7 @@
 #include "bitboard.h"
 #include "misc.h"
 #include "position.h"
+#include "evaluate.h"
 
 namespace Stockfish {
 
@@ -170,12 +171,17 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
 
             // penalty for moving to a square threatened by a lesser piece
             // or bonus for escaping an attack by a lesser piece.
-            if (KNIGHT <= pt && pt <= QUEEN)
+            if (KNIGHT <= pt)
             {
-                static constexpr int bonus[QUEEN + 1] = {0, 0, 144, 144, 256, 517};
-                int v = threatByLesser[pt] & to ? -95 : 100 * bool(threatByLesser[pt] & from);
-                m.value += bonus[pt] * v;
+                if (pt <= QUEEN)
+                {
+                    static constexpr int bonus[QUEEN + 1] = {0, 0, 144, 144, 256, 517};
+                    int v = threatByLesser[pt] & to ? -95 : 100 * bool(threatByLesser[pt] & from);
+                    m.value += bonus[pt] * v;
+                }
             }
+            else // pt == PAWN
+                m.value += pos.rule50_count() * (640 + Eval::simple_eval(pos));
 
             if (ply < LOW_PLY_HISTORY_SIZE)
                 m.value += 8 * (*lowPlyHistory)[ply][m.from_to()] / (1 + ply);
