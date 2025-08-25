@@ -49,7 +49,7 @@ struct ExtMove: public Move {
 inline bool operator<(const ExtMove& f, const ExtMove& s) { return f.value < s.value; }
 
 template<GenType>
-Move* generate(const Position& pos, Move* moveList);
+std::tuple<Move*, bool> generate(const Position& pos, Move* moveList, Bitboard);
 
 // The MoveList struct wraps the generate() function and returns a convenient
 // list of moves. Using MoveList is sometimes preferable to directly calling
@@ -57,15 +57,19 @@ Move* generate(const Position& pos, Move* moveList);
 template<GenType T>
 struct MoveList {
 
-    explicit MoveList(const Position& pos) :
-        last(generate<T>(pos, moveList)) {}
+    explicit MoveList(const Position& pos, Bitboard threats = 0)
+    {
+        std::tie(last, king_pawn_move) = generate<T>(pos, moveList, threats);
+    }
     const Move* begin() const { return moveList; }
     const Move* end() const { return last; }
     size_t      size() const { return last - moveList; }
     bool        contains(Move move) const { return std::find(begin(), end(), move) != end(); }
+    bool has_king_or_pawn_move() const { return king_pawn_move; };
 
    private:
     Move moveList[MAX_MOVES], *last;
+    bool king_pawn_move;
 };
 
 }  // namespace Stockfish

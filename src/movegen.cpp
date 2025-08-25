@@ -22,6 +22,7 @@
 #include <initializer_list>
 
 #include "bitboard.h"
+#include "misc.h"
 #include "position.h"
 
 #if defined(USE_AVX512ICL)
@@ -226,12 +227,13 @@ Move* generate_moves(const Position& pos, Move* moveList, Bitboard target) {
 
 
 template<Color Us, GenType Type>
-Move* generate_all(const Position& pos, Move* moveList) {
+std::tuple<Move*, bool> generate_all(const Position& pos, Move* moveList, Bitboard threats) {
 
     static_assert(Type != LEGAL, "Unsupported type in generate_all()");
 
     const Square ksq = pos.square<KING>(Us);
     Bitboard     target;
+    bool can_move_king_or_pawn = false;
 
     // Skip generating non-king moves when in double check
     if (Type != EVASIONS || !more_than_one(pos.checkers()))
@@ -241,14 +243,18 @@ Move* generate_all(const Position& pos, Move* moveList) {
                : Type == CAPTURES     ? pos.pieces(~Us)
                                       : ~pos.pieces();  // QUIETS
 
+        auto old_ml = moveList;
         moveList = generate_pawn_moves<Us, Type>(pos, moveList, target);
+        can_move_king_or_pawn |= (moveList != old_ml);
+
         moveList = generate_moves<Us, KNIGHT>(pos, moveList, target);
         moveList = generate_moves<Us, BISHOP>(pos, moveList, target);
         moveList = generate_moves<Us, ROOK>(pos, moveList, target);
         moveList = generate_moves<Us, QUEEN>(pos, moveList, target);
     }
 
-    Bitboard b = attacks_bb<KING>(ksq) & (Type == EVASIONS ? ~pos.pieces(Us) : target);
+    Bitboard b = attacks_bb<KING>(ksq) & (Type == EVASIONS ? ~pos.pieces(Us) : target) & ~threats;
+    can_move_king_or_pawn |= b;
 
     moveList = splat_moves(moveList, ksq, b);
 
@@ -257,7 +263,7 @@ Move* generate_all(const Position& pos, Move* moveList) {
             if (!pos.castling_impeded(cr) && pos.can_castle(cr))
                 *moveList++ = Move::make<CASTLING>(ksq, pos.castling_rook_square(cr));
 
-    return moveList;
+    return {moveList, can_move_king_or_pawn};
 }
 
 }  // namespace
@@ -270,43 +276,49 @@ Move* generate_all(const Position& pos, Move* moveList) {
 //
 // Returns a pointer to the end of the move list.
 template<GenType Type>
-Move* generate(const Position& pos, Move* moveList) {
+std::tuple<Move*, bool> generate(const Position& pos, Move* moveList, Bitboard threats) {
 
     static_assert(Type != LEGAL, "Unsupported type in generate()");
     assert((Type == EVASIONS) == bool(pos.checkers()));
 
     Color us = pos.side_to_move();
 
-    return us == WHITE ? generate_all<WHITE, Type>(pos, moveList)
-                       : generate_all<BLACK, Type>(pos, moveList);
+    return us == WHITE ? generate_all<WHITE, Type>(pos, moveList, threats)
+                       : generate_all<BLACK, Type>(pos, moveList, threats);
 }
 
 // Explicit template instantiations
-template Move* generate<CAPTURES>(const Position&, Move*);
-template Move* generate<QUIETS>(const Position&, Move*);
-template Move* generate<EVASIONS>(const Position&, Move*);
-template Move* generate<NON_EVASIONS>(const Position&, Move*);
+template std::tuple<Move*, bool> generate<CAPTURES>(const Position&, Move*, Bitboard);
+template std::tuple<Move*, bool> generate<QUIETS>(const Position&, Move*, Bitboard);
+template std::tuple<Move*, bool> generate<EVASIONS>(const Position&, Move*, Bitboard);
+template std::tuple<Move*, bool> generate<NON_EVASIONS>(const Position&, Move*, Bitboard);
 
 // generate<LEGAL> generates all the legal moves in the given position
 
 template<>
-Move* generate<LEGAL>(const Position& pos, Move* moveList) {
+std::tuple<Move*, bool> generate<LEGAL>(const Position& pos, Move* moveList, Bitboard threats) {
 
     Color    us     = pos.side_to_move();
     Bitboard pinned = pos.blockers_for_king(us) & pos.pieces(us);
     Square   ksq    = pos.square<KING>(us);
     Move*    cur    = moveList;
+    bool can_move_king_or_pawn = false;
 
-    moveList =
-      pos.checkers() ? generate<EVASIONS>(pos, moveList) : generate<NON_EVASIONS>(pos, moveList);
+    std::tie(moveList, std::ignore) =
+      pos.checkers() ? generate<EVASIONS>(pos, moveList, threats) : generate<NON_EVASIONS>(pos, moveList, threats);
+
     while (cur != moveList)
         if (((pinned & cur->from_sq()) || cur->from_sq() == ksq || cur->type_of() == EN_PASSANT)
             && !pos.legal(*cur))
+        {
+            auto moved_piece = type_of(pos.moved_piece(*cur));
+            can_move_king_or_pawn |=  moved_piece == KING || moved_piece == PAWN;
             *cur = *(--moveList);
+        }
         else
             ++cur;
 
-    return moveList;
+    return {moveList, can_move_king_or_pawn};
 }
 
 }  // namespace Stockfish

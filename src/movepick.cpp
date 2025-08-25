@@ -104,6 +104,16 @@ MovePicker::MovePicker(const Position&              p,
 
     else
         stage = (depth > 0 ? MAIN_TT : QSEARCH_TT) + !(ttm && pos.pseudo_legal(ttm));
+    compute_threats();
+}
+
+void MovePicker::compute_threats() {
+    Color us = pos.side_to_move();
+    threatByLesser[KNIGHT] = threatByLesser[BISHOP] = pos.attacks_by<PAWN>(~us);
+    threatByLesser[ROOK] =
+      pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[KNIGHT];
+    threatByLesser[QUEEN] = pos.attacks_by<ROOK>(~us) | threatByLesser[ROOK];
+    threatByLesser[KING] = pos.attacks_by<KING>(~us) | pos.attacks_by<QUEEN>(~us) | threatByLesser[ROOK];
 }
 
 // MovePicker constructor for ProbCut: we generate captures with Static Exchange
@@ -117,6 +127,7 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
 
     stage = PROBCUT_TT
           + !(ttm && pos.capture_stage(ttm) && pos.pseudo_legal(ttm) && pos.see_ge(ttm, threshold));
+    compute_threats();
 }
 
 // Assigns a numerical value to each move in a list, used for sorting.
@@ -128,15 +139,6 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
     static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong type");
 
     Color us = pos.side_to_move();
-
-    [[maybe_unused]] Bitboard threatByLesser[QUEEN + 1];
-    if constexpr (Type == QUIETS)
-    {
-        threatByLesser[KNIGHT] = threatByLesser[BISHOP] = pos.attacks_by<PAWN>(~us);
-        threatByLesser[ROOK] =
-          pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[KNIGHT];
-        threatByLesser[QUEEN] = pos.attacks_by<ROOK>(~us) | threatByLesser[ROOK];
-    }
 
     ExtMove* it = cur;
     for (auto move : ml)
@@ -228,7 +230,7 @@ top:
     case CAPTURE_INIT :
     case PROBCUT_INIT :
     case QCAPTURE_INIT : {
-        MoveList<CAPTURES> ml(pos);
+        MoveList<CAPTURES> ml(pos, threatByLesser[KING]);
 
         cur = endBadCaptures = moves;
         endCur = endCaptures = score<CAPTURES>(ml);
@@ -253,7 +255,8 @@ top:
     case QUIET_INIT :
         if (!skipQuiets)
         {
-            MoveList<QUIETS> ml(pos);
+            MoveList<QUIETS> ml(pos, threatByLesser[KING]);
+            quiet_king_pawn_move = ml.has_king_or_pawn_move();
 
             endCur = endGenerated = score<QUIETS>(ml);
 
@@ -321,18 +324,7 @@ bool MovePicker::can_move_king_or_pawn() const {
 
     assert((GOOD_QUIET <= stage && stage <= BAD_QUIET) || stage == EVASION);
 
-    // Until good capture state no quiet moves are generated for comparison so simply assume king or pawns can move.
-    // Do the same for other states that don't have a valid available move list.
-    if ((GOOD_QUIET > stage || stage > BAD_QUIET) && stage != EVASION)
-        return true;
-
-    for (const ExtMove* m = moves; m < endGenerated; ++m)
-    {
-        PieceType movedPieceType = type_of(pos.moved_piece(*m));
-        if ((movedPieceType == PAWN || movedPieceType == KING) && pos.legal(*m))
-            return true;
-    }
-    return false;
+    return quiet_king_pawn_move;
 }
 
 }  // namespace Stockfish

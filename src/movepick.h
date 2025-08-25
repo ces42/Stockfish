@@ -51,6 +51,7 @@ class MovePicker {
     Move next_move();
     void skip_quiet_moves();
     bool can_move_king_or_pawn() const;
+    void compute_threats();
 
    private:
     template<typename Pred>
@@ -73,7 +74,9 @@ class MovePicker {
     Depth                        depth;
     int                          ply;
     bool                         skipQuiets = false;
+    bool                         quiet_king_pawn_move = true;
     ExtMove                      moves[MAX_MOVES];
+    Bitboard threatByLesser[KING + 1];
 };
 
 }  // namespace Stockfish
