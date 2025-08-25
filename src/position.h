@@ -105,7 +105,7 @@ class Position {
     // Castling
     CastlingRights castling_rights(Color c) const;
     bool           can_castle(CastlingRights cr) const;
-    bool           castling_impeded(CastlingRights cr) const;
+    bool           castling_impeded(CastlingRights cr, Bitboard threats = 0) const;
     Square         castling_rook_square(CastlingRights cr) const;
 
     // Checking
@@ -252,9 +252,9 @@ inline CastlingRights Position::castling_rights(Color c) const {
     return c & CastlingRights(st->castlingRights);
 }
 
-inline bool Position::castling_impeded(CastlingRights cr) const {
+inline bool Position::castling_impeded(CastlingRights cr, Bitboard threats) const {
     assert(cr == WHITE_OO || cr == WHITE_OOO || cr == BLACK_OO || cr == BLACK_OOO);
-    return pieces() & castlingPath[cr];
+    return (pieces() | threats) & castlingPath[cr];
 }
 
 inline Square Position::castling_rook_square(CastlingRights cr) const {
