@@ -222,7 +222,7 @@ uint8_t TranspositionTable::generation() const { return generation8; }
 // to be replaced later. The replace value of an entry is calculated as its depth
 // minus 8 times its relative age. TTEntry t1 is considered more valuable than
 // TTEntry t2 if its replace value is greater than that of t2.
-std::tuple<bool, TTData, TTWriter> TranspositionTable::probe(const Key key) const {
+std::tuple<bool, TTData, TTWriter> TranspositionTable::probe(const Key key, int maxPc) const {
 
     TTEntry* const tte   = first_entry(key);
     const uint16_t key16 = uint16_t(key);  // Use the low 16 bits as key inside the cluster
@@ -233,12 +233,29 @@ std::tuple<bool, TTData, TTWriter> TranspositionTable::probe(const Key key) cons
             // After `read()` completes that copy is final, but may be self-inconsistent.
             return {tte[i].is_occupied(), tte[i].read(), TTWriter(&tte[i])};
 
+    // bool has_expired = false;
+    for (int i = 0; i < ClusterSize; ++i)
+    {
+        // dbg_hit_on((tte[i].key16 & 0b11111) > maxPc);
+        // has_expired |= (tte[i].key16 & 0b11111) > maxPc;
+        if ((tte[i].key16 & 0b11111) > maxPc)
+            return {false,
+                TTData{Move::none(), VALUE_NONE, VALUE_NONE, DEPTH_ENTRY_OFFSET, BOUND_NONE, false},
+                TTWriter(&tte[i])};
+    }
+
     // Find an entry to be replaced according to the replacement strategy
+    // bool rep_expired = false;
     TTEntry* replace = tte;
     for (int i = 1; i < ClusterSize; ++i)
         if (replace->depth8 - replace->relative_age(generation8)
             > tte[i].depth8 - tte[i].relative_age(generation8))
+        {
             replace = &tte[i];
+            // rep_expired = (tte[i].key16 & 0b11111) > maxPc;
+        }
+    // dbg_hit_on(has_expired && !rep_expired, 1);
+
 
     return {false,
             TTData{Move::none(), VALUE_NONE, VALUE_NONE, DEPTH_ENTRY_OFFSET, BOUND_NONE, false},

@@ -92,7 +92,7 @@ class TranspositionTable {
     new_search();  // This must be called at the beginning of each root search to track entry aging
     uint8_t generation() const;  // The current age, used when writing new data to the TT
     std::tuple<bool, TTData, TTWriter>
-    probe(const Key key) const;  // The main method, whose retvals separate local vs global objects
+    probe(const Key key, int maxPc) const;  // The main method, whose retvals separate local vs global objects
     TTEntry* first_entry(const Key key)
       const;  // This is the hash function; its only external use is memory prefetching.
 

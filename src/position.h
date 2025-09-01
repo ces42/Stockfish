@@ -282,7 +282,7 @@ inline Bitboard Position::pinners(Color c) const { return st->pinners[c]; }
 
 inline Bitboard Position::check_squares(PieceType pt) const { return st->checkSquares[pt]; }
 
-inline Key Position::key() const { return adjust_key50(st->key); }
+inline Key Position::key() const { return (adjust_key50(st->key) & ~0b11111ULL) | (count<ALL_PIECES>() - 1); }
 
 inline Key Position::adjust_key50(Key k) const {
     return st->rule50 < 14 ? k : k ^ make_key((st->rule50 - 14) / 8);
