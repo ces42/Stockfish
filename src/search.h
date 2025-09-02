@@ -334,6 +334,7 @@ class Worker {
     Value optimism[COLOR_NB];
 
     Position  rootPos;
+    int       pieceCount;
     StateInfo rootState;
     RootMoves rootMoves;
     Depth     rootDepth, completedDepth;

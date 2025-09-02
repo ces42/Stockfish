@@ -29,8 +29,7 @@
 namespace Stockfish {
 
 class ThreadPool;
-struct TTEntry;
-struct Cluster;
+
 
 // There is only one global hash table for the engine and all its threads. For chess in particular, we even allow racy
 // updates between threads to and from the TT, as taking the time to synchronize access would cost thinking time and
@@ -66,15 +65,68 @@ struct TTData {
 };
 
 
-// This is used to make racy writes to the global TT.
-struct TTWriter {
-   public:
-    void write(Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8);
+// TTEntry struct is the 10 bytes transposition table entry, defined as below:
+//
+// key        16 bit
+// depth       8 bit
+// generation  5 bit
+// pv node     1 bit
+// bound type  2 bit
+// move       16 bit
+// value      16 bit
+// evaluation 16 bit
+//
+// These fields are in the same order as accessed by TT::probe(), since memory is fastest sequentially.
+// Equally, the store order in save() matches this order.
+
+struct TTEntry {
+
+    // Convert internal bitfields to external types
+    TTData read() const {
+        return TTData{Move(move16),           Value(value16),
+                      Value(eval16),          Depth(depth8 + DEPTH_ENTRY_OFFSET),
+                      Bound(genBound8 & 0x3), bool(genBound8 & 0x4)};
+    }
+
+    bool is_occupied() const;
+    void save(Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8);
+    // The returned age is a multiple of TranspositionTable::GENERATION_DELTA
+    uint8_t relative_age(const uint8_t generation8) const;
 
    private:
     friend class TranspositionTable;
-    TTEntry* entry;
-    TTWriter(TTEntry* tte);
+
+    uint16_t key16;
+    uint8_t  depth8;
+    uint8_t  genBound8;
+    Move     move16;
+    int16_t  value16;
+    int16_t  eval16;
+};
+
+
+// A TranspositionTable is an array of Cluster, of size clusterCount. Each cluster consists of ClusterSize number
+// of TTEntry. Each non-empty TTEntry contains information on exactly one position. The size of a Cluster should
+// divide the size of a cache line for best performance, as the cacheline is prefetched when possible.
+
+static constexpr int ClusterSize = 3;
+
+struct Cluster {
+    TTEntry entry[ClusterSize];
+    uint16_t    padding_data;  // Pad to 32 bytes
+};
+static_assert(sizeof(Cluster) == 32, "Suboptimal Cluster size");
+
+// This is used to make racy writes to the global TT.
+struct TTWriter {
+   public:
+    void write(Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8, int pcCount);
+
+   private:
+    friend class TranspositionTable;
+    Cluster* cluster;
+    int position;
+    TTWriter(Cluster* clust, int position);
 };
 
 
@@ -92,9 +144,8 @@ class TranspositionTable {
     new_search();  // This must be called at the beginning of each root search to track entry aging
     uint8_t generation() const;  // The current age, used when writing new data to the TT
     std::tuple<bool, TTData, TTWriter>
-    probe(const Key key) const;  // The main method, whose retvals separate local vs global objects
-    TTEntry* first_entry(const Key key)
-      const;  // This is the hash function; its only external use is memory prefetching.
+    probe(const Key key, int maxPc) const;  // The main method, whose retvals separate local vs global objects
+    Cluster* cluster(const Key key) const;  // This is the hash function; its only external use is memory prefetching.
 
    private:
     friend struct TTEntry;
