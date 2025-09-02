@@ -102,12 +102,13 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
 // http://web.archive.org/web/20201107002606/https://marcelk.net/2013-04-06/paper/upcoming-rep-v2.pdf
 
 // First and second hash functions for indexing the cuckoo tables
-inline int H1(Key h) { return h & 0x1fff; }
-inline int H2(Key h) { return (h >> 16) & 0x1fff; }
+inline int H1(Key h) { return (h >> 5) & 0x1fff; }
+inline int H2(Key h) { return (h >> 21) & 0x1fff; }
 
 // Cuckoo tables with Zobrist hashes of valid reversible moves, and the moves themselves
 std::array<Key, 8192>  cuckoo;
 std::array<Move, 8192> cuckooMove;
+Key KEY_MASK = ~(32ULL - 1);
 
 // Initializes at startup the various arrays used to compute hash keys
 void Position::init() {
@@ -116,19 +117,19 @@ void Position::init() {
 
     for (Piece pc : Pieces)
         for (Square s = SQ_A1; s <= SQ_H8; ++s)
-            Zobrist::psq[pc][s] = rng.rand<Key>();
+            Zobrist::psq[pc][s] = rng.rand<Key>() & KEY_MASK;
     // pawns on these squares will promote
     std::fill_n(Zobrist::psq[W_PAWN] + SQ_A8, 8, 0);
     std::fill_n(Zobrist::psq[B_PAWN], 8, 0);
 
     for (File f = FILE_A; f <= FILE_H; ++f)
-        Zobrist::enpassant[f] = rng.rand<Key>();
+        Zobrist::enpassant[f] = rng.rand<Key>() & KEY_MASK;
 
     for (int cr = NO_CASTLING; cr <= ANY_CASTLING; ++cr)
-        Zobrist::castling[cr] = rng.rand<Key>();
+        Zobrist::castling[cr] = rng.rand<Key>() & KEY_MASK;
 
-    Zobrist::side    = rng.rand<Key>();
-    Zobrist::noPawns = rng.rand<Key>();
+    Zobrist::side    = rng.rand<Key>() & KEY_MASK;
+    Zobrist::noPawns = rng.rand<Key>() & KEY_MASK;
 
     // Prepare the cuckoo tables
     cuckoo.fill(0);
@@ -924,7 +925,7 @@ DirtyPiece Position::do_move(Move                      m,
     // Update the key with the final value
     st->key = k;
     if (tt)
-        prefetch(tt->first_entry(key()));
+        prefetch(tt->cluster(key()));
 
     // Calculate the repetition info. It is the ply distance from the previous
     // occurrence of the same position, negative in the 3-fold case, or zero
@@ -1068,7 +1069,7 @@ void Position::do_null_move(StateInfo& newSt, const TranspositionTable& tt) {
     }
 
     st->key ^= Zobrist::side;
-    prefetch(tt.first_entry(key()));
+    prefetch(tt.cluster(key()));
 
     st->pliesFromNull = 0;
 

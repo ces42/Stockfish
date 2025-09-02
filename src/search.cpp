@@ -607,6 +607,7 @@ Value Search::Worker::search(
     assert(PvNode || (alpha == beta - 1));
     assert(0 < depth && depth < MAX_PLY);
     assert(!(PvNode && cutNode));
+    assert(pos.count<ALL_PIECES>() <= pieceCount);
 
     Move      pv[MAX_PLY + 1];
     StateInfo st;
@@ -670,7 +671,7 @@ Value Search::Worker::search(
     // Step 4. Transposition table lookup
     excludedMove                   = ss->excludedMove;
     posKey                         = pos.key();
-    auto [ttHit, ttData, ttWriter] = tt.probe(posKey);
+    auto [ttHit, ttData, ttWriter] = tt.probe(posKey, pieceCount);
     // Need further processing of the saved data
     ss->ttHit    = ttHit;
     ttData.move  = rootNode ? rootMoves[pvIdx].pv[0] : ttHit ? ttData.move : Move::none();
@@ -712,7 +713,7 @@ Value Search::Worker::search(
             {
                 pos.do_move(ttData.move, st);
                 Key nextPosKey                             = pos.key();
-                auto [ttHitNext, ttDataNext, ttWriterNext] = tt.probe(nextPosKey);
+                auto [ttHitNext, ttDataNext, ttWriterNext] = tt.probe(nextPosKey, pieceCount);
                 pos.undo_move(ttData.move);
 
                 // Check that the ttValue after the tt move would also trigger a cutoff
@@ -763,7 +764,7 @@ Value Search::Worker::search(
                 {
                     ttWriter.write(posKey, value_to_tt(value, ss->ply), ss->ttPv, b,
                                    std::min(MAX_PLY - 1, depth + 6), Move::none(), VALUE_NONE,
-                                   tt.generation());
+                                   tt.generation(), pos.count<ALL_PIECES>());
 
                     return value;
                 }
@@ -812,7 +813,7 @@ Value Search::Worker::search(
 
         // Static evaluation is saved as it was before adjustment by correction history
         ttWriter.write(posKey, VALUE_NONE, ss->ttPv, BOUND_NONE, DEPTH_UNSEARCHED, Move::none(),
-                       unadjustedStaticEval, tt.generation());
+                       unadjustedStaticEval, tt.generation(), pos.count<ALL_PIECES>());
     }
 
     // Use static evaluation difference to improve quiet move ordering
@@ -950,7 +951,7 @@ Value Search::Worker::search(
             {
                 // Save ProbCut data into transposition table
                 ttWriter.write(posKey, value_to_tt(value, ss->ply), ss->ttPv, BOUND_LOWER,
-                               probCutDepth + 1, move, unadjustedStaticEval, tt.generation());
+                               probCutDepth + 1, move, unadjustedStaticEval, tt.generation(), pos.count<ALL_PIECES>());
 
                 if (!is_decisive(value))
                     return value - (probCutBeta - beta);
@@ -1444,7 +1445,7 @@ moves_loop:  // When in check, search starts here
                        : PvNode && bestMove ? BOUND_EXACT
                                             : BOUND_UPPER,
                        moveCount != 0 ? depth : std::min(MAX_PLY - 1, depth + 6), bestMove,
-                       unadjustedStaticEval, tt.generation());
+                       unadjustedStaticEval, tt.generation(), pos.count<ALL_PIECES>());
 
     // Adjust correction history
     if (!ss->inCheck && !(bestMove && pos.capture(bestMove))
@@ -1519,7 +1520,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
     // Step 3. Transposition table lookup
     posKey                         = pos.key();
-    auto [ttHit, ttData, ttWriter] = tt.probe(posKey);
+    auto [ttHit, ttData, ttWriter] = tt.probe(posKey, pieceCount);
     // Need further processing of the saved data
     ss->ttHit    = ttHit;
     ttData.move  = ttHit ? ttData.move : Move::none();
@@ -1570,7 +1571,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
             if (!ss->ttHit)
                 ttWriter.write(posKey, value_to_tt(bestValue, ss->ply), false, BOUND_LOWER,
                                DEPTH_UNSEARCHED, Move::none(), unadjustedStaticEval,
-                               tt.generation());
+                               tt.generation(), pos.count<ALL_PIECES>());
             return bestValue;
         }
 
@@ -1703,7 +1704,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
     // is saved as it was before adjustment by correction history.
     ttWriter.write(posKey, value_to_tt(bestValue, ss->ply), pvHit,
                    bestValue >= beta ? BOUND_LOWER : BOUND_UPPER, DEPTH_QS, bestMove,
-                   unadjustedStaticEval, tt.generation());
+                   unadjustedStaticEval, tt.generation(), pos.count<ALL_PIECES>());
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
@@ -2163,7 +2164,7 @@ bool RootMove::extract_ponder_from_tt(const TranspositionTable& tt, Position& po
 
     pos.do_move(pv[0], st, &tt);
 
-    auto [ttHit, ttData, ttWriter] = tt.probe(pos.key());
+    auto [ttHit, ttData, ttWriter] = tt.probe(pos.key(), 32);
     if (ttHit)
     {
         if (MoveList<LEGAL>(pos).contains(ttData.move))
