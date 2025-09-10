@@ -358,7 +358,7 @@ constexpr Direction pawn_push(Color c) { return c == WHITE ? NORTH : SOUTH; }
 
 // Based on a congruential pseudo-random number generator
 constexpr Key make_key(uint64_t seed) {
-    return seed * ( 6364136223846793005ULL << 5 ) + (1442695040888963407ULL << 5);
+    return seed * 6364136223846793005ULL + 1442695040888963407ULL;
 }
 
 
