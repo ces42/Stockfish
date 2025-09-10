@@ -87,7 +87,7 @@ uint8_t TTEntry::relative_age(const uint8_t generation8) const {
 
 // TTWriter is but a very thin wrapper around the pointer
 TTWriter::TTWriter(Cluster* clust, int pos) :
-    cluster(clust), position(pos) {}
+    cluster(clust), position(pos) { assert(pos < ClusterSize); }
 
 void TTWriter::write(
   Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8, int pcCount) {
@@ -186,7 +186,6 @@ std::tuple<bool, TTData, TTWriter> TranspositionTable::probe(const Key key, int 
             // After `read()` completes that copy is final, but may be self-inconsistent.
             return {tte[i].is_occupied(), tte[i].read(), TTWriter(clust, i)};
 
-    // bool has_expired = false;
     for (int i = 0; i < ClusterSize; ++i)
     {
         // dbg_hit_on((tte[i].key16 & 0b11111) > maxPc);
@@ -199,15 +198,19 @@ std::tuple<bool, TTData, TTWriter> TranspositionTable::probe(const Key key, int 
 
     // Find an entry to be replaced according to the replacement strategy
     TTEntry* replace = tte;
+    int replace_pos = 0;
     int i = 1;
     for (; i < ClusterSize; ++i)
         if (replace->depth8 - replace->relative_age(generation8)
             > tte[i].depth8 - tte[i].relative_age(generation8))
+        {
             replace = &tte[i];
+            replace_pos = i;
+        }
 
     return {false,
             TTData{Move::none(), VALUE_NONE, VALUE_NONE, DEPTH_ENTRY_OFFSET, BOUND_NONE, false},
-            TTWriter(clust, i)};
+            TTWriter(clust, replace_pos)};
 }
 
 
