@@ -153,7 +153,30 @@ class FeatureTransformer {
 
         permute_weights();
         scale_weights(true);
+        rearrange_biases();
         return !stream.fail();
+    }
+
+    void rearrange_biases() {
+        // for (bool persp : {WHITE, BLACK})
+        // {
+            for (Square ksq = SQ_A1; ksq <= SQ_H8; ++ksq)
+            {
+                if (file_of(ksq) >= 4)
+                    continue;
+                // IndexType index = persp == WHITE
+                //     ? Features::HalfKAv2_hm::make_index<WHITE>(ksq, W_KING, ksq)
+                //     : Features::HalfKAv2_hm::make_index<BLACK>(ksq, B_KING, ksq);
+                IndexType index = Features::HalfKAv2_hm::make_index<WHITE>(ksq, W_KING, ksq);
+                const IndexType offset = HalfDimensions * index;
+                for (IndexType j = 0; j < HalfDimensions; ++j)
+                {
+                    weights[offset + j] += biases[j];
+                }
+            }
+        // }
+        for (IndexType j = 0; j < TransformedFeatureDimensions; ++j)
+            biases[j] = 0;
     }
 
     // Write network parameters
