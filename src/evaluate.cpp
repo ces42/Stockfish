@@ -99,7 +99,7 @@ std::string Eval::trace(Position& pos, const Eval::NNUE::Networks& networks) {
         return "Final evaluation: none (in check)";
 
     Eval::NNUE::AccumulatorStack accumulators;
-    auto                         caches = std::make_unique<Eval::NNUE::AccumulatorCaches>(networks);
+    auto                         caches = std::make_unique<Eval::NNUE::AccumulatorCaches>();
 
     std::stringstream ss;
     ss << std::showpoint << std::noshowpos << std::fixed << std::setprecision(2);
