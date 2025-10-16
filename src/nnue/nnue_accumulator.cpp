@@ -363,7 +363,7 @@ void update_accumulator_incremental(
 }
 
 template<Color Perspective, IndexType Dimensions>
-void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
+void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& featureTransformer,
                                       const Position&                       pos,
                                       AccumulatorState&                     accumulatorState,
                                       AccumulatorCaches::Cache<Dimensions>& cache) {
@@ -425,8 +425,12 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
             pos.square<KING>(Perspective), make_piece(Perspective, KING), ksq
         );
 
-        bias = &ft.weights[Dimensions * biasIdx];
-        psqtBias = &ft.psqtWeights[PSQTBuckets * biasIdx];
+        bias = &featureTransformer.weights[Dimensions * biasIdx];
+        psqtBias = &featureTransformer.psqtWeights[PSQTBuckets * biasIdx];
+#ifndef VECTOR
+        std::memcpy(entry.accumulation, bias, sizeof(BiasType) * Dimensions);
+        std::memcpy(entry.psqtAccumulation, psqtBias, sizeof(int32_t) * PSQTBuckets);
+#endif
     } else {
         bias = entry.accumulation;
         psqtBias = entry.psqtAccumulation;
@@ -443,7 +447,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
     {
         auto weightTileAt = [&](IndexType idx) {
             return reinterpret_cast<const vec_t*>(
-                &ft.weights[Dimensions * idx + j * Tiling::TileHeight]
+                &featureTransformer.weights[Dimensions * idx + j * Tiling::TileHeight]
             );
         };
         auto* firstTile = reinterpret_cast<const vec_t*>(&bias[j * Tiling::TileHeight]);
@@ -489,7 +493,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
     {
         auto psqtWeightTileAt = [&](IndexType idx) {
             return reinterpret_cast<const psqt_vec_t*>(
-                &ft.psqtWeights[PSQTBuckets * idx + j * Tiling::PsqtTileHeight]
+                &featureTransformer.psqtWeights[PSQTBuckets * idx + j * Tiling::PsqtTileHeight]
             );
         };
         auto* firstTilePsqt =
