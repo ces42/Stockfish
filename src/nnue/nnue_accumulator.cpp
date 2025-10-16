@@ -399,7 +399,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
     const WeightType* bias;
     const PSQTWeightType* psqtBias;
 
-    if (added.size() + removed.size() > (unsigned) pos.count<ALL_PIECES>())
+    if (added.size() + removed.size() >= (unsigned) pos.count<ALL_PIECES>())
     {
         added.clear();
         removed.clear();
