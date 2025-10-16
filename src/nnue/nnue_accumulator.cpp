@@ -57,11 +57,6 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
                                       AccumulatorState&                     accumulatorState,
                                       AccumulatorCaches::Cache<Dimensions>& cache);
 
-template<Color Perspective, IndexType Dimensions>
-void update_accumulator_from_scratch(const FeatureTransformer<Dimensions>& featureTransformer,
-                                      const Position&                       pos,
-                                      AccumulatorState&                     accumulatorState,
-                                      AccumulatorCaches::Cache<Dimensions>& cache);
 }
 
 void AccumulatorState::reset(const DirtyPiece& dp) noexcept {
@@ -567,119 +562,6 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
         entry.byTypeBB[pt] = pos.pieces(pt);
 }
 
-
-
-template<Color Perspective, IndexType Dimensions>
-void update_accumulator_from_scratch(const FeatureTransformer<Dimensions>& ft,
-                                      const Position&                       pos,
-                                      AccumulatorState&                     accumulatorState,
-                                      AccumulatorCaches::Cache<Dimensions>& cache) {
-
-    using Tiling [[maybe_unused]] = SIMDTiling<Dimensions, Dimensions, PSQTBuckets>;
-
-    const Square          ksq   = pos.square<KING>(Perspective);
-    auto&                 entry = cache[ksq][Perspective];
-    FeatureSet::IndexList added;
-
-    for (Color c : {WHITE, BLACK})
-    {
-        for (PieceType pt = PAWN; pt < KING; ++pt)
-        {
-            const Piece    piece    = make_piece(c, pt);
-            const Bitboard newBB    = pos.pieces(c, pt);
-            Bitboard       toAdd    = newBB;
-
-            while (toAdd)
-            {
-                Square sq = pop_lsb(toAdd);
-                added.push_back(FeatureSet::make_index<Perspective>(sq, piece, ksq));
-            }
-        }
-    }
-    added.push_back(FeatureSet::make_index<Perspective>(
-        pos.square<KING>(~Perspective), make_piece(~Perspective, KING), ksq
-    ));
-    IndexType biasIdx = FeatureSet::make_index<Perspective>(
-        pos.square<KING>(Perspective), make_piece(Perspective, KING), ksq
-    );
-
-    auto& accumulator                 = accumulatorState.acc<Dimensions>();
-    accumulator.computed[Perspective] = true;
-
-#ifdef VECTOR
-    vec_t      acc[Tiling::NumRegs];
-    psqt_vec_t psqt[Tiling::NumPsqtRegs];
-
-    for (IndexType j = 0; j < Dimensions / Tiling::TileHeight; ++j)
-    {
-
-        const IndexType first_off = Dimensions * biasIdx + j * Tiling::TileHeight;
-        auto* firstTile = reinterpret_cast<const vec_t*>(&ft.weights[first_off]);
-
-        for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-            acc[k] = firstTile[k];
-
-        IndexType i = 0;
-        for (; i < added.size(); ++i)
-        {
-            IndexType       index  = added[i];
-            const IndexType offset = Dimensions * index + j * Tiling::TileHeight;
-            auto* column = reinterpret_cast<const vec_t*>(&ft.weights[offset]);
-
-            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-                acc[k] = vec_add_16(acc[k], column[k]);
-        }
-
-        auto* entryTile = reinterpret_cast<vec_t*>(&entry.accumulation[j * Tiling::TileHeight]);
-        for (IndexType k = 0; k < Tiling::NumRegs; k++)
-            vec_store(&entryTile[k], acc[k]);
-
-        auto* accTile =
-          reinterpret_cast<vec_t*>(&accumulator.accumulation[Perspective][j * Tiling::TileHeight]);
-        for (IndexType k = 0; k < Tiling::NumRegs; k++)
-            vec_store(&accTile[k], acc[k]);
-    }
-
-    for (IndexType j = 0; j < PSQTBuckets / Tiling::PsqtTileHeight; ++j)
-    {
-
-        const IndexType first_off = PSQTBuckets * biasIdx + j * Tiling::PsqtTileHeight;
-        auto* firstTilePsqt = reinterpret_cast<const vec_t*>(&ft.psqtWeights[first_off]);
-        for (IndexType k = 0; k < Tiling::NumPsqtRegs; ++k)
-            psqt[k] = firstTilePsqt[k];
-
-        for (IndexType i = 0; i < added.size(); ++i)
-        {
-            IndexType       index  = added[i];
-            const IndexType offset = PSQTBuckets * index + j * Tiling::PsqtTileHeight;
-            auto*           columnPsqt =
-              reinterpret_cast<const psqt_vec_t*>(&ft.psqtWeights[offset]);
-
-            for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
-                psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
-        }
-
-        auto* accTilePsqt = reinterpret_cast<psqt_vec_t*>(
-          &accumulator.psqtAccumulation[Perspective][j * Tiling::PsqtTileHeight]);
-        auto* entryTilePsqt =
-          reinterpret_cast<psqt_vec_t*>(&entry.psqtAccumulation[j * Tiling::PsqtTileHeight]);
-        for (IndexType k = 0; k < Tiling::NumPsqtRegs; ++k)
-            vec_store_psqt(&entryTilePsqt[k], psqt[k]);
-        for (IndexType k = 0; k < Tiling::NumPsqtRegs; ++k)
-            vec_store_psqt(&accTilePsqt[k], psqt[k]);
-    }
-
-#else
-
-    static_assert(false);
-#endif
-
-    for (Color c : {WHITE, BLACK})
-        entry.byColorBB[c] = pos.pieces(c);
-
-    for (PieceType pt = PAWN; pt <= KING; ++pt)
-        entry.byTypeBB[pt] = pos.pieces(pt);
-}
 
 }
 
