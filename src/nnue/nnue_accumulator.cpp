@@ -373,6 +373,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
     const Square          ksq   = pos.square<KING>(Perspective);
     auto&                 entry = cache[ksq][Perspective];
     FeatureSet::IndexList removed, added;
+top:
 
     for (Color c : {WHITE, BLACK})
     {
@@ -396,26 +397,11 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
             }
         }
     }
-    // if (std::all_of(std::begin(entry.byTypeBB), std::end(entry.byTypeBB),
-    //                 [](Bitboard b) { return b == 0; })
-    //     && std::all_of(std::begin(entry.byColorBB), std::end(entry.byColorBB),
-    //                 [](Bitboard b) { return b == 0; })
-    // ) {
-    //     dbg_hit_on(false, 5);
-    //     assert(
-    //         std::any_of(added.begin(), added.end(),
-    //                 [&](IndexType i) { return i == FeatureSet::make_index<Perspective>(ksq, W_KING, ksq); })
-    //     );
-    // } else {
-    //     dbg_hit_on(true, 5);
-    //     assert(
-    //         std::all_of(added.begin(), added.end(),
-    //                 [&](IndexType i) { return i != FeatureSet::make_index<Perspective>(ksq, W_KING, ksq); })
-    //     );
-    // }
-    // dbg_mean_of(added.size() + removed.size());
-    // dbg_stdev_of(added.size() + removed.size());
-    // dbg_mean_of(std::max(0, int(added.size() + removed.size()) - pos.count<ALL_PIECES>()), 10);
+    if (added.size() + removed.size() > pos.count<ALL_PIECES>())
+    {
+        entry.clear();
+        goto top;
+    }
 
     auto& accumulator                 = accumulatorState.acc<Dimensions>();
     accumulator.computed[Perspective] = true;

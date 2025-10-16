@@ -162,15 +162,11 @@ class FeatureTransformer {
         {
             if (file_of(ksq) >= 4)
                 continue;
-            IndexType index = Features::HalfKAv2_hm::make_index<WHITE>(ksq, W_KING, ksq);
-            const IndexType offset = HalfDimensions * index;
+            const IndexType offset = HalfDimensions * Features::HalfKAv2_hm::make_index<WHITE>(ksq, W_KING, ksq);
             for (IndexType j = 0; j < HalfDimensions; ++j)
-            {
                 weights[offset + j] += biases[j];
-            }
         }
-        for (IndexType j = 0; j < HalfDimensions; ++j)
-            biases[j] = 0;
+        std::memset(biases, 0, sizeof(biases));
     }
 
     // Write network parameters
