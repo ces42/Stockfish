@@ -416,6 +416,11 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
 
     for (IndexType j = 0; j < Dimensions / Tiling::TileHeight; ++j)
     {
+        auto weightTileAt = [&](IndexType idx) {
+            return reinterpret_cast<const vec_t*>(
+                &ft.weights[Dimensions * idx + j * Tiling::TileHeight]
+            );
+        };
         auto* accTile =
           reinterpret_cast<vec_t*>(&accumulator.accumulation[Perspective][j * Tiling::TileHeight]);
         auto* entryTile = reinterpret_cast<vec_t*>(&entry.accumulation[j * Tiling::TileHeight]);
@@ -426,30 +431,22 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
         IndexType i = 0;
         for (; i < std::min(removed.size(), added.size()); ++i)
         {
-            IndexType       indexR  = removed[i];
-            const IndexType offsetR = Dimensions * indexR + j * Tiling::TileHeight;
-            auto* columnR = reinterpret_cast<const vec_t*>(&ft.weights[offsetR]);
-            IndexType       indexA  = added[i];
-            const IndexType offsetA = Dimensions * indexA + j * Tiling::TileHeight;
-            auto* columnA = reinterpret_cast<const vec_t*>(&ft.weights[offsetA]);
+            auto* columnR = weightTileAt(removed[i]);
+            auto* columnA = weightTileAt(added[i]);
 
             for (IndexType k = 0; k < Tiling::NumRegs; ++k)
                 acc[k] = fused<Vec16Wrapper, Add, Sub>(acc[k], columnA[k], columnR[k]);
         }
         for (; i < removed.size(); ++i)
         {
-            IndexType       index  = removed[i];
-            const IndexType offset = Dimensions * index + j * Tiling::TileHeight;
-            auto* column = reinterpret_cast<const vec_t*>(&ft.weights[offset]);
+            auto* column = weightTileAt(removed[i]);
 
             for (IndexType k = 0; k < Tiling::NumRegs; ++k)
                 acc[k] = vec_sub_16(acc[k], column[k]);
         }
         for (; i < added.size(); ++i)
         {
-            IndexType       index  = added[i];
-            const IndexType offset = Dimensions * index + j * Tiling::TileHeight;
-            auto* column = reinterpret_cast<const vec_t*>(&ft.weights[offset]);
+            auto* column = weightTileAt(added[i]);
 
             for (IndexType k = 0; k < Tiling::NumRegs; ++k)
                 acc[k] = vec_add_16(acc[k], column[k]);
@@ -463,6 +460,11 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
 
     for (IndexType j = 0; j < PSQTBuckets / Tiling::PsqtTileHeight; ++j)
     {
+        auto psqtWeightTileAt = [&](IndexType idx) {
+            return reinterpret_cast<const psqt_vec_t*>(
+                &ft.psqtWeights[PSQTBuckets * idx + j * Tiling::PsqtTileHeight]
+            );
+        };
         auto* accTilePsqt = reinterpret_cast<psqt_vec_t*>(
           &accumulator.psqtAccumulation[Perspective][j * Tiling::PsqtTileHeight]);
         auto* entryTilePsqt =
@@ -473,20 +475,14 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
 
         for (IndexType i = 0; i < removed.size(); ++i)
         {
-            IndexType       index  = removed[i];
-            const IndexType offset = PSQTBuckets * index + j * Tiling::PsqtTileHeight;
-            auto*           columnPsqt =
-              reinterpret_cast<const psqt_vec_t*>(&ft.psqtWeights[offset]);
+            auto* columnPsqt = psqtWeightTileAt(removed[i]);
 
             for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
                 psqt[k] = vec_sub_psqt_32(psqt[k], columnPsqt[k]);
         }
         for (IndexType i = 0; i < added.size(); ++i)
         {
-            IndexType       index  = added[i];
-            const IndexType offset = PSQTBuckets * index + j * Tiling::PsqtTileHeight;
-            auto*           columnPsqt =
-              reinterpret_cast<const psqt_vec_t*>(&ft.psqtWeights[offset]);
+            auto* columnPsqt = psqtWeightTileAt(added[i]);
 
             for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
                 psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
