@@ -158,24 +158,18 @@ class FeatureTransformer {
     }
 
     void rearrange_biases() {
-        // for (bool persp : {WHITE, BLACK})
-        // {
-            for (Square ksq = SQ_A1; ksq <= SQ_H8; ++ksq)
+        for (Square ksq = SQ_A1; ksq <= SQ_H8; ++ksq)
+        {
+            if (file_of(ksq) >= 4)
+                continue;
+            IndexType index = Features::HalfKAv2_hm::make_index<WHITE>(ksq, W_KING, ksq);
+            const IndexType offset = HalfDimensions * index;
+            for (IndexType j = 0; j < HalfDimensions; ++j)
             {
-                if (file_of(ksq) >= 4)
-                    continue;
-                // IndexType index = persp == WHITE
-                //     ? Features::HalfKAv2_hm::make_index<WHITE>(ksq, W_KING, ksq)
-                //     : Features::HalfKAv2_hm::make_index<BLACK>(ksq, B_KING, ksq);
-                IndexType index = Features::HalfKAv2_hm::make_index<WHITE>(ksq, W_KING, ksq);
-                const IndexType offset = HalfDimensions * index;
-                for (IndexType j = 0; j < HalfDimensions; ++j)
-                {
-                    weights[offset + j] += biases[j];
-                }
+                weights[offset + j] += biases[j];
             }
-        // }
-        for (IndexType j = 0; j < TransformedFeatureDimensions; ++j)
+        }
+        for (IndexType j = 0; j < HalfDimensions; ++j)
             biases[j] = 0;
     }
 
