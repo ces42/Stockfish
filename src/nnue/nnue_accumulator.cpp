@@ -626,8 +626,26 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions>& featu
     }
 
 #else
+    std::memcpy(entry.accumulation, &featureTransformer.weights[Dimensions * biasIdx],
+                sizeof(BiasType) * Dimensions);
+    for (const auto index : added)
+    {
+        const IndexType offset = Dimensions * index;
+        for (IndexType j = 0; j < Dimensions; ++j)
+            entry.accumulation[j] += featureTransformer.weights[offset + j];
 
-    static_assert(false);
+        for (std::size_t k = 0; k < PSQTBuckets; ++k)
+            entry.psqtAccumulation[k] += featureTransformer.psqtWeights[index * PSQTBuckets + k];
+    }
+
+    // The accumulator of the refresh entry has been updated.
+    // Now copy its content to the actual accumulator we were refreshing.
+
+    std::memcpy(accumulator.accumulation[Perspective], entry.accumulation,
+                sizeof(BiasType) * Dimensions);
+
+    std::memcpy(accumulator.psqtAccumulation[Perspective], entry.psqtAccumulation,
+                sizeof(int32_t) * PSQTBuckets);
 #endif
 
     for (Color c : {WHITE, BLACK})
