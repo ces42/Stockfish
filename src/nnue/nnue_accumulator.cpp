@@ -446,9 +446,10 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
         }
 
         for (IndexType k = 0; k < Tiling::NumRegs; k++)
+        {
             vec_store(&entryTile[k], acc[k]);
-        for (IndexType k = 0; k < Tiling::NumRegs; k++)
             vec_store(&accTile[k], acc[k]);
+        }
     }
 
     for (IndexType j = 0; j < PSQTBuckets / Tiling::PsqtTileHeight; ++j)
@@ -483,9 +484,10 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
         }
 
         for (IndexType k = 0; k < Tiling::NumPsqtRegs; ++k)
+        {
             vec_store_psqt(&entryTilePsqt[k], psqt[k]);
-        for (IndexType k = 0; k < Tiling::NumPsqtRegs; ++k)
             vec_store_psqt(&accTilePsqt[k], psqt[k]);
+        }
     }
 
 #else
