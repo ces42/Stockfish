@@ -550,24 +550,11 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions>& featu
     auto&                 entry = cache[ksq][Perspective];
     FeatureSet::IndexList added;
 
-    for (Color c : {WHITE, BLACK})
-    {
-        for (PieceType pt = PAWN; pt < KING; ++pt)
-        {
-            const Piece    piece    = make_piece(c, pt);
-            const Bitboard newBB    = pos.pieces(c, pt);
-            Bitboard       toAdd    = newBB;
-
-            while (toAdd)
-            {
-                Square sq = pop_lsb(toAdd);
-                added.push_back(FeatureSet::make_index<Perspective>(sq, piece, ksq));
-            }
-        }
+    Bitboard pieces = pos.pieces() & ~pos.pieces(Perspective, KING);
+    while (pieces) {
+        Square sq = pop_lsb(pieces);
+        added.push_back(FeatureSet::make_index<Perspective>(sq, pos.piece_on(sq), ksq));
     }
-    added.push_back(FeatureSet::make_index<Perspective>(
-        pos.square<KING>(~Perspective), make_piece(~Perspective, KING), ksq
-    ));
     IndexType biasIdx = FeatureSet::make_index<Perspective>(
         pos.square<KING>(Perspective), make_piece(Perspective, KING), ksq
     );
