@@ -402,12 +402,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
     const WeightType* bias;
     const PSQTWeightType* psqtBias;
 
-    Piece new_pieces[SQUARE_NB];
-    for (Square sq = SQUARE_ZERO; sq < SQUARE_NB; ++sq)
-    {
-        new_pieces[sq] = pos.piece_on(sq);
-    }
-    const Bitboard changed_bb = get_changed_pieces(entry.pieces, new_pieces);
+    const Bitboard changed_bb = get_changed_pieces(entry.pieces, pos.piece_array());
 
     if (popcount(changed_bb) >= pos.count<ALL_PIECES>())
     {
@@ -446,7 +441,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
     }
 
     entry.pieceBB = pos.pieces();
-    std::copy_n(new_pieces, SQUARE_NB, entry.pieces);
+    std::copy_n(pos.piece_array(), SQUARE_NB, entry.pieces);
 
 
 #ifdef VECTOR
