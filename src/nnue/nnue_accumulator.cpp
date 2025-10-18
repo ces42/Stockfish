@@ -60,7 +60,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
 template<Color Perspective, IndexType Dimensions>
 void update_accumulator_from_scratch(const FeatureTransformer<Dimensions>& featureTransformer,
                                       const Position&                       pos,
-                                      AccumulatorState&                     accumulatorState,
+                                      Accumulator<Dimensions>&              accumulator,
                                       AccumulatorCaches::Cache<Dimensions>& cache);
 }
 
@@ -367,6 +367,29 @@ void update_accumulator_incremental(
     (target_state.acc<TransformedFeatureDimensions>()).computed[Perspective] = true;
 }
 
+Bitboard get_changed_pieces(const Piece old[SQUARE_NB], const Piece new_[SQUARE_NB]) {
+#if defined(USE_AVX512) || defined(USE_AVX2)
+    static_assert(sizeof(Piece) == 1);
+    Bitboard same_bb = 0;
+    for (int i = 0; i < 64; i += 32)
+    {
+        const __m256i       old_v = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(old + i));
+        const __m256i       new_v = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(new_ + i));
+        const __m256i       cmp_equal  = _mm256_cmpeq_epi8(old_v, new_v);
+        const std::uint32_t equal_mask = _mm256_movemask_epi8(cmp_equal);
+        same_bb |= static_cast<Bitboard>(equal_mask) << i;
+    }
+    return ~same_bb;
+#else
+    Bitboard changed = 0;
+    for (Square sq = SQUARE_ZERO; sq < SQUARE_NB; ++sq)
+    {
+        changed |= static_cast<Bitboard>(old[sq] != new_[sq]) << sq;
+    }
+    return changed;
+#endif
+}
+
 template<Color Perspective, IndexType Dimensions>
 void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
                                       const Position&                       pos,
@@ -379,36 +402,41 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
     auto&                 entry = cache[ksq][Perspective];
     FeatureSet::IndexList removed, added;
 
-    for (Color c : {WHITE, BLACK})
-    {
-        for (PieceType pt = PAWN; pt <= KING; ++pt)
-        {
-            const Piece    piece    = make_piece(c, pt);
-            const Bitboard oldBB    = entry.byColorBB[c] & entry.byTypeBB[pt];
-            const Bitboard newBB    = pos.pieces(c, pt);
-            Bitboard       toRemove = oldBB & ~newBB;
-            Bitboard       toAdd    = newBB & ~oldBB;
+    auto& accumulator                 = accumulatorState.acc<Dimensions>();
+    accumulator.computed[Perspective] = true;
 
-            while (toRemove)
-            {
-                Square sq = pop_lsb(toRemove);
-                removed.push_back(FeatureSet::make_index<Perspective>(sq, piece, ksq));
-            }
-            while (toAdd)
-            {
-                Square sq = pop_lsb(toAdd);
-                added.push_back(FeatureSet::make_index<Perspective>(sq, piece, ksq));
-            }
-        }
-    }
-    if (added.size() + removed.size() >= pos.count<ALL_PIECES>())
+    Piece new_pieces[SQUARE_NB];
+    for (Square sq = SQUARE_ZERO; sq < SQUARE_NB; ++sq)
     {
-        update_accumulator_from_scratch<Perspective>(ft, pos, accumulatorState, cache);
+        new_pieces[sq] = pos.piece_on(sq);
+    }
+    const Bitboard changed_bb = get_changed_pieces(entry.pieces, new_pieces);
+
+    if (popcount(changed_bb) >= pos.count<ALL_PIECES>())
+    {
+        update_accumulator_from_scratch<Perspective>(ft, pos, accumulator, cache);
+        entry.pieceBB = pos.pieces();
+        std::copy_n(new_pieces, SQUARE_NB, entry.pieces);
         return;
     }
 
-    auto& accumulator                 = accumulatorState.acc<Dimensions>();
-    accumulator.computed[Perspective] = true;
+    Bitboard       removed_bb = changed_bb & entry.pieceBB;
+    Bitboard       added_bb   = changed_bb & pos.pieces();
+
+    while (removed_bb)
+    {
+        Square sq = pop_lsb(removed_bb);
+        removed.push_back(FeatureSet::make_index<Perspective>(sq, entry.pieces[sq], ksq));
+    }
+    while (added_bb)
+    {
+        Square sq = pop_lsb(added_bb);
+        added.push_back(FeatureSet::make_index<Perspective>(sq, pos.piece_on(sq), ksq));
+    }
+
+    entry.pieceBB = pos.pieces();
+    std::copy_n(new_pieces, SQUARE_NB, entry.pieces);
+
 
 #ifdef VECTOR
     vec_t      acc[Tiling::NumRegs];
@@ -528,12 +556,6 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
     std::memcpy(accumulator.psqtAccumulation[Perspective], entry.psqtAccumulation,
                 sizeof(int32_t) * PSQTBuckets);
 #endif
-
-    for (Color c : {WHITE, BLACK})
-        entry.byColorBB[c] = pos.pieces(c);
-
-    for (PieceType pt = PAWN; pt <= KING; ++pt)
-        entry.byTypeBB[pt] = pos.pieces(pt);
 }
 
 
@@ -541,7 +563,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
 template<Color Perspective, IndexType Dimensions>
 void update_accumulator_from_scratch(const FeatureTransformer<Dimensions>& featureTransformer,
                                       const Position&                       pos,
-                                      AccumulatorState&                     accumulatorState,
+                                      Accumulator<Dimensions>&                     accumulator,
                                       AccumulatorCaches::Cache<Dimensions>& cache) {
 
     using Tiling [[maybe_unused]] = SIMDTiling<Dimensions, Dimensions, PSQTBuckets>;
@@ -558,9 +580,6 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions>& featu
     IndexType biasIdx = FeatureSet::make_index<Perspective>(
         pos.square<KING>(Perspective), make_piece(Perspective, KING), ksq
     );
-
-    auto& accumulator                 = accumulatorState.acc<Dimensions>();
-    accumulator.computed[Perspective] = true;
 
 #ifdef VECTOR
     vec_t      acc[Tiling::NumRegs];
@@ -647,12 +666,6 @@ void update_accumulator_from_scratch(const FeatureTransformer<Dimensions>& featu
     std::memcpy(accumulator.psqtAccumulation[Perspective], entry.psqtAccumulation,
                 sizeof(int32_t) * PSQTBuckets);
 #endif
-
-    for (Color c : {WHITE, BLACK})
-        entry.byColorBB[c] = pos.pieces(c);
-
-    for (PieceType pt = PAWN; pt <= KING; ++pt)
-        entry.byTypeBB[pt] = pos.pieces(pt);
 }
 
 }
