@@ -20,7 +20,6 @@
 
 #include <cassert>
 #include <cstdint>
-#include <initializer_list>
 #include <type_traits>
 
 #include "../bitboard.h"
@@ -57,11 +56,6 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
                                       AccumulatorState&                     accumulatorState,
                                       AccumulatorCaches::Cache<Dimensions>& cache);
 
-// template<Color Perspective, IndexType Dimensions>
-// void update_accumulator_from_scratch(const FeatureTransformer<Dimensions>& featureTransformer,
-//                                       const Position&                       pos,
-//                                       Accumulator<Dimensions>&              accumulator,
-//                                       AccumulatorCaches::Cache<Dimensions>& cache);
 }
 
 void AccumulatorState::reset(const DirtyPiece& dp) noexcept {
@@ -391,7 +385,7 @@ Bitboard get_changed_pieces(const Piece old[SQUARE_NB], const Piece new_[SQUARE_
 }
 
 template<Color Perspective, IndexType Dimensions>
-void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
+void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& featureTransformer,
                                       const Position&                       pos,
                                       AccumulatorState&                     accumulatorState,
                                       AccumulatorCaches::Cache<Dimensions>& cache) {
@@ -425,8 +419,8 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
         IndexType biasIdx = FeatureSet::make_index<Perspective>(
             pos.square<KING>(Perspective), make_piece(Perspective, KING), ksq
         );
-        bias = &ft.weights[Dimensions * biasIdx];
-        psqtBias = &ft.psqtWeights[PSQTBuckets * biasIdx];
+        bias = &featureTransformer.weights[Dimensions * biasIdx];
+        psqtBias = &featureTransformer.psqtWeights[PSQTBuckets * biasIdx];
 #ifndef VECTOR
         std::memcpy(entry.accumulation, bias, sizeof(BiasType) * Dimensions);
         std::memcpy(entry.psqtAccumulation, psqtBias, sizeof(int32_t) * PSQTBuckets);
@@ -471,10 +465,10 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
         {
             IndexType       indexR  = removed[i];
             const IndexType offsetR = Dimensions * indexR + j * Tiling::TileHeight;
-            auto* columnR = reinterpret_cast<const vec_t*>(&ft.weights[offsetR]);
+            auto* columnR = reinterpret_cast<const vec_t*>(&featureTransformer.weights[offsetR]);
             IndexType       indexA  = added[i];
             const IndexType offsetA = Dimensions * indexA + j * Tiling::TileHeight;
-            auto* columnA = reinterpret_cast<const vec_t*>(&ft.weights[offsetA]);
+            auto* columnA = reinterpret_cast<const vec_t*>(&featureTransformer.weights[offsetA]);
 
             for (IndexType k = 0; k < Tiling::NumRegs; ++k)
                 acc[k] = fused<Vec16Wrapper, Add, Sub>(acc[k], columnA[k], columnR[k]);
@@ -483,7 +477,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
         {
             IndexType       index  = removed[i];
             const IndexType offset = Dimensions * index + j * Tiling::TileHeight;
-            auto* column = reinterpret_cast<const vec_t*>(&ft.weights[offset]);
+            auto* column = reinterpret_cast<const vec_t*>(&featureTransformer.weights[offset]);
 
             for (IndexType k = 0; k < Tiling::NumRegs; ++k)
                 acc[k] = vec_sub_16(acc[k], column[k]);
@@ -492,7 +486,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
         {
             IndexType       index  = added[i];
             const IndexType offset = Dimensions * index + j * Tiling::TileHeight;
-            auto* column = reinterpret_cast<const vec_t*>(&ft.weights[offset]);
+            auto* column = reinterpret_cast<const vec_t*>(&featureTransformer.weights[offset]);
 
             for (IndexType k = 0; k < Tiling::NumRegs; ++k)
                 acc[k] = vec_add_16(acc[k], column[k]);
@@ -520,7 +514,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
             IndexType       index  = removed[i];
             const IndexType offset = PSQTBuckets * index + j * Tiling::PsqtTileHeight;
             auto*           columnPsqt =
-              reinterpret_cast<const psqt_vec_t*>(&ft.psqtWeights[offset]);
+              reinterpret_cast<const psqt_vec_t*>(&featureTransformer.psqtWeights[offset]);
 
             for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
                 psqt[k] = vec_sub_psqt_32(psqt[k], columnPsqt[k]);
@@ -530,7 +524,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
             IndexType       index  = added[i];
             const IndexType offset = PSQTBuckets * index + j * Tiling::PsqtTileHeight;
             auto*           columnPsqt =
-              reinterpret_cast<const psqt_vec_t*>(&ft.psqtWeights[offset]);
+              reinterpret_cast<const psqt_vec_t*>(&featureTransformer.psqtWeights[offset]);
 
             for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
                 psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
@@ -577,116 +571,6 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& ft,
                 sizeof(int32_t) * PSQTBuckets);
 #endif
 }
-
-
-
-// template<Color Perspective, IndexType Dimensions>
-// void update_accumulator_from_scratch(const FeatureTransformer<Dimensions>& featureTransformer,
-//                                       const Position&                       pos,
-//                                       Accumulator<Dimensions>&                     accumulator,
-//                                       AccumulatorCaches::Cache<Dimensions>& cache) {
-//
-//     using Tiling [[maybe_unused]] = SIMDTiling<Dimensions, Dimensions, PSQTBuckets>;
-//
-//     const Square          ksq   = pos.square<KING>(Perspective);
-//     auto&                 entry = cache[ksq][Perspective];
-//     FeatureSet::IndexList added;
-//
-//     Bitboard pieces = pos.pieces() & ~pos.pieces(Perspective, KING);
-//     while (pieces) {
-//         Square sq = pop_lsb(pieces);
-//         added.push_back(FeatureSet::make_index<Perspective>(sq, pos.piece_on(sq), ksq));
-//     }
-//     IndexType biasIdx = FeatureSet::make_index<Perspective>(
-//         pos.square<KING>(Perspective), make_piece(Perspective, KING), ksq
-//     );
-//
-// #ifdef VECTOR
-//     vec_t      acc[Tiling::NumRegs];
-//     psqt_vec_t psqt[Tiling::NumPsqtRegs];
-//
-//     for (IndexType j = 0; j < Dimensions / Tiling::TileHeight; ++j)
-//     {
-//
-//         const IndexType first_off = Dimensions * biasIdx + j * Tiling::TileHeight;
-//         auto* firstTile = reinterpret_cast<const vec_t*>(&featureTransformer.weights[first_off]);
-//
-//         for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-//             acc[k] = firstTile[k];
-//
-//         IndexType i = 0;
-//         for (; i < added.size(); ++i)
-//         {
-//             IndexType       index  = added[i];
-//             const IndexType offset = Dimensions * index + j * Tiling::TileHeight;
-//             auto* column = reinterpret_cast<const vec_t*>(&featureTransformer.weights[offset]);
-//
-//             for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-//                 acc[k] = vec_add_16(acc[k], column[k]);
-//         }
-//
-//         auto* entryTile = reinterpret_cast<vec_t*>(&entry.accumulation[j * Tiling::TileHeight]);
-//         for (IndexType k = 0; k < Tiling::NumRegs; k++)
-//             vec_store(&entryTile[k], acc[k]);
-//
-//         auto* accTile =
-//           reinterpret_cast<vec_t*>(&accumulator.accumulation[Perspective][j * Tiling::TileHeight]);
-//         for (IndexType k = 0; k < Tiling::NumRegs; k++)
-//             vec_store(&accTile[k], acc[k]);
-//     }
-//
-//     for (IndexType j = 0; j < PSQTBuckets / Tiling::PsqtTileHeight; ++j)
-//     {
-//
-//         const IndexType first_off = PSQTBuckets * biasIdx + j * Tiling::PsqtTileHeight;
-//         auto* firstTilePsqt = reinterpret_cast<const vec_t*>(&featureTransformer.psqtWeights[first_off]);
-//         for (IndexType k = 0; k < Tiling::NumPsqtRegs; ++k)
-//             psqt[k] = firstTilePsqt[k];
-//
-//         for (IndexType i = 0; i < added.size(); ++i)
-//         {
-//             IndexType       index  = added[i];
-//             const IndexType offset = PSQTBuckets * index + j * Tiling::PsqtTileHeight;
-//             auto*           columnPsqt =
-//               reinterpret_cast<const psqt_vec_t*>(&featureTransformer.psqtWeights[offset]);
-//
-//             for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
-//                 psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
-//         }
-//
-//         auto* accTilePsqt = reinterpret_cast<psqt_vec_t*>(
-//           &accumulator.psqtAccumulation[Perspective][j * Tiling::PsqtTileHeight]);
-//         auto* entryTilePsqt =
-//           reinterpret_cast<psqt_vec_t*>(&entry.psqtAccumulation[j * Tiling::PsqtTileHeight]);
-//         for (IndexType k = 0; k < Tiling::NumPsqtRegs; ++k)
-//             vec_store_psqt(&entryTilePsqt[k], psqt[k]);
-//         for (IndexType k = 0; k < Tiling::NumPsqtRegs; ++k)
-//             vec_store_psqt(&accTilePsqt[k], psqt[k]);
-//     }
-//
-// #else
-//     std::memcpy(entry.accumulation, &featureTransformer.weights[Dimensions * biasIdx],
-//                 sizeof(BiasType) * Dimensions);
-//     for (const auto index : added)
-//     {
-//         const IndexType offset = Dimensions * index;
-//         for (IndexType j = 0; j < Dimensions; ++j)
-//             entry.accumulation[j] += featureTransformer.weights[offset + j];
-//
-//         for (std::size_t k = 0; k < PSQTBuckets; ++k)
-//             entry.psqtAccumulation[k] += featureTransformer.psqtWeights[index * PSQTBuckets + k];
-//     }
-//
-//     // The accumulator of the refresh entry has been updated.
-//     // Now copy its content to the actual accumulator we were refreshing.
-//
-//     std::memcpy(accumulator.accumulation[Perspective], entry.accumulation,
-//                 sizeof(BiasType) * Dimensions);
-//
-//     std::memcpy(accumulator.psqtAccumulation[Perspective], entry.psqtAccumulation,
-//                 sizeof(int32_t) * PSQTBuckets);
-// #endif
-// }
 
 }
 
