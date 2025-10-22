@@ -92,8 +92,8 @@ TTWriter::TTWriter(Cluster* clust, int pos) :
 void TTWriter::write(
   Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8, int pcCount) {
     cluster->entry[position].save(k, v, pv, b, d, m, ev, generation8);
-    cluster->padding_data &= ~(0b11111 << position);
-    cluster->padding_data |= (pcCount - 1) << position;
+    cluster->padding_data &= ~(0b11111 << 5 * position);
+    cluster->padding_data |= (pcCount - 1) << 5 * position;
 }
 
 
@@ -190,7 +190,7 @@ std::tuple<bool, TTData, TTWriter> TranspositionTable::probe(const Key key, int 
     {
         // dbg_hit_on((tte[i].key16 & 0b11111) > maxPc);
         // has_expired |= (tte[i].key16 & 0b11111) > maxPc;
-        if (((pc_counts >> i) & MASK) > maxPc)
+        if (((pc_counts >> 5 * i) & MASK) + 1 > maxPc)
             return {false,
                 TTData{Move::none(), VALUE_NONE, VALUE_NONE, DEPTH_ENTRY_OFFSET, BOUND_NONE, false},
                 TTWriter(clust, i)};
