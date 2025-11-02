@@ -299,26 +299,37 @@ void update_accumulator_incremental(
     // profile builds on windows with gcc 14.2.0.
     // TODO remove once unneeded
     sf_assume(added.size() == 1 || added.size() == 2);
-    sf_assume(removed.size() == 1 || removed.size() == 2 || removed.size() == 3);
+    sf_assume(removed.size() == 1 || removed.size() == 2 ||
+              (removed.size() == 3 && added.size() == 1));
 
     auto updateContext =
       make_accumulator_update_context(perspective, featureTransformer, computed, target_state);
 
     if (added.size() == 1 && removed.size() == 1)
+        // mostly non-capture moves
         updateContext.template apply<Add, Sub>(added[0], removed[0]);
     else if (added.size() == 1 && removed.size() == 2)
+        // captures
         updateContext.template apply<Add, Sub, Sub>(added[0], removed[0], removed[1]);
-    else if (added.size() == 2 && removed.size() == 1)
-        updateContext.template apply<Add, Add, Sub>(added[0], added[1], removed[0]);
-    else if (added.size() == 2 && removed.size() == 2)
-        updateContext.template apply<Add, Add, Sub, Sub>(added[0], added[1], removed[0],
-                                                         removed[1]);
-    else
+    else if (removed.size() == 3)
     {
-        assert(added.size() == 1 && removed.size() == 3);
-        sf_assume(added.size() == 1 && removed.size() == 3);
+        assert(added.size() == 1);
+        // two captures on the same square, fused
         updateContext.template apply<Add, Sub, Sub, Sub>(added[0], removed[0], removed[1],
                                                          removed[2]);
+    }
+    else if (removed.size() == 1)
+    {
+        // undoing capture
+        assert(added.size() == 2);
+        updateContext.template apply<Add, Add, Sub>(added[0], added[1], removed[0]);
+    }
+    else
+    {
+        // castling
+        assert(added.size() == 2 && removed.size() == 2);
+        updateContext.template apply<Add, Add, Sub, Sub>(added[0], added[1], removed[0],
+                                                         removed[1]);
     }
 
     (target_state.acc<TransformedFeatureDimensions>()).computed[perspective] = true;
