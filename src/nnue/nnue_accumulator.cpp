@@ -18,9 +18,9 @@
 
 #include "nnue_accumulator.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <initializer_list>
 #include <type_traits>
 
 #include "../bitboard.h"
@@ -71,7 +71,7 @@ void AccumulatorStack::reset() noexcept {
 }
 
 void AccumulatorStack::push(const DirtyPiece& dirtyPiece) noexcept {
-    assert(size + 1 < accumulators.size());
+    assert(size < accumulators.size());
     accumulators[size].reset(dirtyPiece);
     size++;
 }
@@ -335,6 +335,29 @@ void update_accumulator_incremental(
     (target_state.acc<TransformedFeatureDimensions>()).computed[perspective] = true;
 }
 
+Bitboard get_changed_pieces(const Piece old[SQUARE_NB], const Piece new_[SQUARE_NB]) {
+#if defined(USE_AVX512) || defined(USE_AVX2)
+    static_assert(sizeof(Piece) == 1);
+    Bitboard same_bb = 0;
+    for (int i = 0; i < 64; i += 32)
+    {
+        const __m256i       old_v = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(old + i));
+        const __m256i       new_v = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(new_ + i));
+        const __m256i       cmp_equal  = _mm256_cmpeq_epi8(old_v, new_v);
+        const std::uint32_t equal_mask = _mm256_movemask_epi8(cmp_equal);
+        same_bb |= static_cast<Bitboard>(equal_mask) << i;
+    }
+    return ~same_bb;
+#else
+    Bitboard changed = 0;
+    for (Square sq = SQUARE_ZERO; sq < SQUARE_NB; ++sq)
+    {
+        changed |= static_cast<Bitboard>(old[sq] != new_[sq]) << sq;
+    }
+    return changed;
+#endif
+}
+
 template<IndexType Dimensions>
 void update_accumulator_refresh_cache(Color                                 perspective,
                                       const FeatureTransformer<Dimensions>& featureTransformer,
@@ -348,28 +371,22 @@ void update_accumulator_refresh_cache(Color                                 pers
     auto&                 entry = cache[ksq][perspective];
     FeatureSet::IndexList removed, added;
 
-    for (Color c : {WHITE, BLACK})
+    const Bitboard changed_bb = get_changed_pieces(entry.pieces, pos.piece_array());
+    Bitboard       removed_bb = changed_bb & entry.pieceBB;
+    Bitboard       added_bb   = changed_bb & pos.pieces();
+    while (removed_bb)
     {
-        for (PieceType pt = PAWN; pt <= KING; ++pt)
-        {
-            const Piece    piece    = make_piece(c, pt);
-            const Bitboard oldBB    = entry.byColorBB[c] & entry.byTypeBB[pt];
-            const Bitboard newBB    = pos.pieces(c, pt);
-            Bitboard       toRemove = oldBB & ~newBB;
-            Bitboard       toAdd    = newBB & ~oldBB;
-
-            while (toRemove)
-            {
-                Square sq = pop_lsb(toRemove);
-                removed.push_back(FeatureSet::make_index(perspective, sq, piece, ksq));
-            }
-            while (toAdd)
-            {
-                Square sq = pop_lsb(toAdd);
-                added.push_back(FeatureSet::make_index(perspective, sq, piece, ksq));
-            }
-        }
+        Square sq = pop_lsb(removed_bb);
+        removed.push_back(FeatureSet::make_index(perspective, sq, entry.pieces[sq], ksq));
     }
+    while (added_bb)
+    {
+        Square sq = pop_lsb(added_bb);
+        added.push_back(FeatureSet::make_index(perspective, sq, pos.piece_on(sq), ksq));
+    }
+
+    entry.pieceBB = pos.pieces();
+    std::copy_n(pos.piece_array(), SQUARE_NB, entry.pieces);
 
     auto& accumulator                 = accumulatorState.acc<Dimensions>();
     accumulator.computed[perspective] = true;
@@ -492,12 +509,6 @@ void update_accumulator_refresh_cache(Color                                 pers
     std::memcpy(accumulator.psqtAccumulation[perspective], entry.psqtAccumulation,
                 sizeof(int32_t) * PSQTBuckets);
 #endif
-
-    for (Color c : {WHITE, BLACK})
-        entry.byColorBB[c] = pos.pieces(c);
-
-    for (PieceType pt = PAWN; pt <= KING; ++pt)
-        entry.byTypeBB[pt] = pos.pieces(pt);
 }
 
 }
