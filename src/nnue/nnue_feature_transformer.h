@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iosfwd>
+#include <set>
 
 #include "../position.h"
 #include "../types.h"
@@ -139,6 +140,40 @@ class FeatureTransformer {
         }
     }
 
+    void rearrange_biases() {
+        std::set<IndexType> seen;
+        for (Square ksq = SQ_A1; ksq <= SQ_H8; ++ksq)
+        {
+            if (file_of(ksq) >= 4)
+                continue;
+
+            auto biasOff = Features::HalfKAv2_hm::make_index<WHITE>(ksq, W_KING, ksq);
+
+            WeightType* biasWeights = weights + HalfDimensions * biasOff;
+            PSQTWeightType* biasPsqt = psqtWeights + PSQTBuckets * biasOff;
+
+            for (Square sq = SQ_A1; sq <= SQ_H8; ++sq)
+            {
+                if (sq == ksq)
+                    continue;
+                IndexType thisOff = Features::HalfKAv2_hm::make_index<WHITE>(sq, B_KING, ksq);
+                assert(seen.find(thisOff) == seen.end());
+                seen.insert(thisOff);
+
+                auto* thisW = weights + HalfDimensions * thisOff;
+                auto* thisPsqt = psqtWeights + PSQTBuckets * thisOff;
+
+                for (IndexType j = 0; j < HalfDimensions; ++j)
+                    thisW[j] += biasWeights[j];
+                for (IndexType j = 0; j < PSQTBuckets; ++j)
+                    thisPsqt[j] += biasPsqt[j];
+            }
+            std::memset(biasWeights, 0, HalfDimensions * sizeof(WeightType));
+            std::memset(biasPsqt, 0, PSQTBuckets * sizeof(PSQTWeightType));
+        }
+        assert(seen.size() == 32 * (64 - 1));
+    }
+
     // Read network parameters
     bool read_parameters(std::istream& stream) {
 
@@ -146,6 +181,7 @@ class FeatureTransformer {
         read_leb_128<PSQTWeightType>(stream, psqtWeights, PSQTBuckets * InputDimensions);
 
         permute_weights();
+        rearrange_biases();
         scale_weights(true);
         return !stream.fail();
     }
