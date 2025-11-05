@@ -181,7 +181,7 @@ class FeatureTransformer {
         read_leb_128<PSQTWeightType>(stream, psqtWeights, PSQTBuckets * InputDimensions);
 
         permute_weights();
-        rearrange_biases();
+        // rearrange_biases();
         scale_weights(true);
         return !stream.fail();
     }
