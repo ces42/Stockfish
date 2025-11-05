@@ -404,17 +404,17 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
     const PSQTWeightType* psqtBias;
 
     const Bitboard changed_bb = get_changed_pieces(entry.pieces, pos.piece_array());
-    dbg_hit_on(popcount(changed_bb) >= pos.count<ALL_PIECES>());
-    dbg_hit_on(popcount(changed_bb) >= pos.count<ALL_PIECES>() - 1, 1);
-    if (popcount(changed_bb) >= pos.count<ALL_PIECES>())
+    // dbg_hit_on(popcount(changed_bb) >= pos.count<ALL_PIECES>());
+    // dbg_hit_on(popcount(changed_bb) >= pos.count<ALL_PIECES>() - 1, 1);
+    if (popcount(changed_bb) >= pos.count<ALL_PIECES>() - 1)
     {
-        Bitboard pieces = pos.pieces() & ~pos.pieces(Perspective, KING);
+        Bitboard pieces = pos.pieces() & ~pos.pieces(KING);
         while (pieces) {
             Square sq = pop_lsb(pieces);
             added.push_back(FeatureSet::make_index<Perspective>(sq, pos.piece_on(sq), ksq));
         }
         IndexType biasIdx = FeatureSet::make_index<Perspective>(
-            pos.square<KING>(Perspective), make_piece(Perspective, KING), ksq
+            pos.square<KING>(~Perspective), make_piece(~Perspective, KING), ksq
         );
         bias = &featureTransformer.weights[Dimensions * biasIdx];
         psqtBias = &featureTransformer.psqtWeights[PSQTBuckets * biasIdx];
