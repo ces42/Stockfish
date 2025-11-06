@@ -406,7 +406,7 @@ void update_accumulator_refresh_cache(const FeatureTransformer<Dimensions>& feat
     const Bitboard changed_bb = get_changed_pieces(entry.pieces, pos.piece_array());
     // dbg_hit_on(popcount(changed_bb) >= pos.count<ALL_PIECES>());
     // dbg_hit_on(popcount(changed_bb) >= pos.count<ALL_PIECES>() - 1, 1);
-    if (popcount(changed_bb) >= pos.count<ALL_PIECES>() - 1)
+    if (popcount(changed_bb) >= pos.count<ALL_PIECES>() - 2)
     {
         Bitboard pieces = pos.pieces() & ~pos.pieces(KING);
         while (pieces) {
