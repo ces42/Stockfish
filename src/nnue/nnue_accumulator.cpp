@@ -39,13 +39,6 @@ using namespace SIMD;
 
 namespace {
 
-template<Color Perspective, IndexType TransformedFeatureDimensions>
-void double_inc_update(const FeatureTransformer<TransformedFeatureDimensions>& featureTransformer,
-                       const Square                                            ksq,
-                       AccumulatorState<PSQFeatureSet>&                        middle_state,
-                       AccumulatorState<PSQFeatureSet>&                        target_state,
-                       const AccumulatorState<PSQFeatureSet>&                  computed);
-
 template<Color Perspective,
          bool  Forward,
          typename FeatureSet,
@@ -200,28 +193,6 @@ void AccumulatorStack::forward_update_incremental(
 
     for (std::size_t next = begin + 1; next < size; next++)
     {
-        if (next + 1 < size)
-        {
-            DirtyPiece& dp1 = mut_accumulators<PSQFeatureSet>()[next].diff;
-            DirtyPiece& dp2 = mut_accumulators<PSQFeatureSet>()[next + 1].diff;
-
-            auto& accumulators = mut_accumulators<FeatureSet>();
-
-            if constexpr (std::is_same_v<FeatureSet, PSQFeatureSet>)
-            {
-                if (dp1.to != SQ_NONE && dp1.to == dp2.remove_sq)
-                {
-                    const Square captureSq = dp1.to;
-                    dp1.to = dp2.remove_sq = SQ_NONE;
-                    double_inc_update<Perspective>(featureTransformer, ksq, accumulators[next],
-                                                   accumulators[next + 1], accumulators[next - 1]);
-                    dp1.to = dp2.remove_sq = captureSq;
-                    next++;
-                    continue;
-                }
-            }
-        }
-
         update_accumulator_incremental<Perspective, true>(featureTransformer, ksq,
                                                           mut_accumulators<FeatureSet>()[next],
                                                           accumulators<FeatureSet>()[next - 1]);
@@ -450,49 +421,6 @@ auto make_accumulator_update_context(const FeatureTransformer<Dimensions>& featu
                                      AccumulatorState<FeatureSet>&         accumulatorTo) noexcept {
     return AccumulatorUpdateContext<FeatureSet, Perspective, Dimensions>{
       featureTransformer, accumulatorFrom, accumulatorTo};
-}
-
-template<Color Perspective, IndexType TransformedFeatureDimensions>
-void double_inc_update(const FeatureTransformer<TransformedFeatureDimensions>& featureTransformer,
-                       const Square                                            ksq,
-                       AccumulatorState<PSQFeatureSet>&                        middle_state,
-                       AccumulatorState<PSQFeatureSet>&                        target_state,
-                       const AccumulatorState<PSQFeatureSet>&                  computed) {
-
-    assert(computed.acc<TransformedFeatureDimensions>().computed[Perspective]);
-    assert(!middle_state.acc<TransformedFeatureDimensions>().computed[Perspective]);
-    assert(!target_state.acc<TransformedFeatureDimensions>().computed[Perspective]);
-
-    PSQFeatureSet::IndexList removed, added;
-    PSQFeatureSet::append_changed_indices<Perspective>(ksq, middle_state.diff, removed, added);
-    // you can't capture a piece that was just involved in castling since the rook ends up
-    // in a square that the king passed
-    assert(added.size() < 2);
-    PSQFeatureSet::append_changed_indices<Perspective>(ksq, target_state.diff, removed, added);
-
-    assert(added.size() == 1);
-    assert(removed.size() == 2 || removed.size() == 3);
-
-    // Workaround compiler warning for uninitialized variables, replicated on
-    // profile builds on windows with gcc 14.2.0.
-    // TODO remove once unneeded
-    sf_assume(added.size() == 1);
-    sf_assume(removed.size() == 2 || removed.size() == 3);
-
-    auto updateContext =
-      make_accumulator_update_context<Perspective>(featureTransformer, computed, target_state);
-
-    if (removed.size() == 2)
-    {
-        updateContext.template apply<Add, Sub, Sub>(added[0], removed[0], removed[1]);
-    }
-    else
-    {
-        updateContext.template apply<Add, Sub, Sub, Sub>(added[0], removed[0], removed[1],
-                                                         removed[2]);
-    }
-
-    target_state.acc<TransformedFeatureDimensions>().computed[Perspective] = true;
 }
 
 template<Color Perspective,
