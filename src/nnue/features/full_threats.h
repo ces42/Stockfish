@@ -77,13 +77,6 @@ class FullThreats {
     };
     // clang-format on
 
-    struct FusedUpdateData {
-        Bitboard dp2removedOriginBoard = 0;
-        Bitboard dp2removedTargetBoard = 0;
-
-        Square dp2removed;
-    };
-
     // Maximum number of simultaneously active features.
     static constexpr IndexType MaxActiveDimensions = 128;
     using IndexList                                = ValueList<IndexType, MaxActiveDimensions>;
@@ -101,9 +94,7 @@ class FullThreats {
     static void append_changed_indices(Square           ksq,
                                        const DiffType&  diff,
                                        IndexList&       removed,
-                                       IndexList&       added,
-                                       FusedUpdateData* fd    = nullptr,
-                                       bool             first = false);
+                                       IndexList&       added);
 
     // Returns whether the change stored in this DirtyPiece means
     // that a full accumulator refresh is required.
