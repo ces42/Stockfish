@@ -63,10 +63,10 @@ struct TTEntry {
    private:
     friend class TranspositionTable;
 
+    Move     move16;
     uint16_t key16;
     uint8_t  depth8;
     uint8_t  genBound8;
-    Move     move16;
     int16_t  value16;
     int16_t  eval16;
 };
@@ -93,9 +93,15 @@ bool TTEntry::is_occupied() const { return bool(depth8); }
 void TTEntry::save(
   Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8) {
 
+    uint64_t data = 0ULL;
     // Preserve the old ttmove if we don't have a new one
     if (m || uint16_t(k) != key16)
-        move16 = m;
+    {
+        // move16 = m;
+        data = m.raw();
+    }
+    else
+        data = move16.raw();
 
     // Overwrite less valuable entries (cheapest checks first)
     if (b == BOUND_EXACT || uint16_t(k) != key16 || d - DEPTH_ENTRY_OFFSET + 2 * pv > depth8 - 4
@@ -104,10 +110,19 @@ void TTEntry::save(
         assert(d > DEPTH_ENTRY_OFFSET);
         assert(d < 256 + DEPTH_ENTRY_OFFSET);
 
-        key16     = uint16_t(k);
-        depth8    = uint8_t(d - DEPTH_ENTRY_OFFSET);
-        genBound8 = uint8_t(generation8 | uint8_t(pv) << 2 | b);
-        value16   = int16_t(v);
+        // key16     = uint16_t(k);
+        data |= uint64_t(uint16_t(k)) << 16;
+        // depth8    = uint8_t(d - DEPTH_ENTRY_OFFSET);
+        data |= uint64_t(uint8_t(d - DEPTH_ENTRY_OFFSET)) << 32;
+        // genBound8 = uint8_t(generation8 | uint8_t(pv) << 2 | b);
+        data |= uint64_t(uint8_t(generation8 | uint8_t(pv) << 2 | b)) << 40;
+        // value16   = int16_t(v);
+        data |= uint64_t(int16_t(v)) << 48;
+        *((uint64_t*) this) = data;
+        // printf("%lx\n", *((uint64_t*) this));
+        // printf("%lx\n", data);
+        // printf("\n");
+        // assert(*((uint64_t*) this) == data);
         eval16    = int16_t(ev);
     }
     else if (depth8 + DEPTH_ENTRY_OFFSET >= 5 && Bound(genBound8 & 0x3) != BOUND_EXACT)
