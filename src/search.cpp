@@ -626,7 +626,7 @@ Value Search::Worker::search(
     Key   posKey;
     Move  move, excludedMove, bestMove;
     Depth extension, newDepth;
-    Value bestValue, value, eval, maxValue, probCutBeta;
+    Value bestValue, value, maxValue, probCutBeta;
     bool  givesCheck, improving, priorCapture, opponentWorsening;
     bool  capture, ttCapture;
     int   priorReduction;
@@ -797,9 +797,9 @@ Value Search::Worker::search(
     {
         // Skip early pruning when in check
         if (__builtin_expect(ss->ply <= 1, false) && ss->ttHit)
-            ss->staticEval = eval = ttData.eval;
+            ss->staticEval = ttData.eval;
         else
-            ss->staticEval = eval = (ss - 2)->staticEval;
+            ss->staticEval = (ss - 2)->staticEval;
         unadjustedStaticEval = ss->staticEval;
         // dbg_hit_on(ss->ttHit && is_valid(ttData.eval));
         // dbg_hit_on(ss->ttHit, 1);
@@ -808,7 +808,9 @@ Value Search::Worker::search(
         improving             = false;
         goto moves_loop;
     }
-    else if (excludedMove)
+
+    Value eval;
+    if (excludedMove)
         unadjustedStaticEval = eval = ss->staticEval;
     else if (ss->ttHit)
     {
@@ -1059,11 +1061,15 @@ moves_loop:  // When in check, search starts here
                 // Futility pruning for captures
                 if (!givesCheck && lmrDepth < 7)
                 {
+                    dbg_hit_on(pos.checkers());
                     Value futilityValue = ss->staticEval + 232 + 217 * lmrDepth
                                         + PieceValue[capturedPiece] + 131 * captHist / 1024;
 
                     if (futilityValue <= alpha)
+                    {
+                        dbg_hit_on(pos.checkers(), 1);
                         continue;
+                    }
                 }
 
                 // SEE based pruning for captures and checks
