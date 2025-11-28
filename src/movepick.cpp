@@ -100,10 +100,16 @@ MovePicker::MovePicker(const Position&              p,
     ply(pl) {
 
     if (pos.checkers())
+    {
+        if (ttm) dbg_hit_on(!pos.pseudo_legal(ttm), 0);
         stage = EVASION_TT + !(ttm && pos.pseudo_legal(ttm));
+    }
 
     else
+    {
+        if (ttm) dbg_hit_on(!pos.pseudo_legal(ttm), 0);
         stage = (depth > 0 ? MAIN_TT : QSEARCH_TT) + !(ttm && pos.pseudo_legal(ttm));
+    }
 }
 
 // MovePicker constructor for ProbCut: we generate captures with Static Exchange
