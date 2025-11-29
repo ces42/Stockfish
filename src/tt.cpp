@@ -46,7 +46,7 @@ namespace Stockfish {
 // These fields are in the same order as accessed by TT::probe(), since memory is fastest sequentially.
 // Equally, the store order in save() matches this order.
 
-#define key_t uint16_t
+#define key_t uint32_t
 
 struct TTEntry {
 
