@@ -796,16 +796,12 @@ Value Search::Worker::search(
     if (ss->inCheck)
     {
         // Skip early pruning when in check
-        if (ss->ttHit)
-        {
-            if (__builtin_expect(ss->ply > 1, true))
-                ss->staticEval = ((ss-2)->staticEval + ttData.eval) / 2;
-            else
-                ss->staticEval = ttData.eval;
-        }
-        else
-            ss->staticEval = eval = (ss - 2)->staticEval;
-        unadjustedStaticEval = ss->staticEval;
+        ss->staticEval = ((ss - 2)->staticEval +
+                          (ss->ttHit ? ttData.eval : (ss-2)->staticEval)) / 2;
+        if (__builtin_expect(ss->ply <= 1, false) && ss->ttHit)
+            ss->staticEval = ttData.eval;
+
+        unadjustedStaticEval = eval = ss->staticEval;
         improving             = false;
         goto moves_loop;
     }
