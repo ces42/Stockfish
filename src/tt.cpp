@@ -46,6 +46,8 @@ namespace Stockfish {
 // These fields are in the same order as accessed by TT::probe(), since memory is fastest sequentially.
 // Equally, the store order in save() matches this order.
 
+#define key_t uint16_t
+
 struct TTEntry {
 
     // Convert internal bitfields to external types
@@ -63,7 +65,7 @@ struct TTEntry {
    private:
     friend class TranspositionTable;
 
-    uint16_t key16;
+    key_t    key16;
     uint8_t  depth8;
     uint8_t  genBound8;
     Move     move16;
@@ -94,17 +96,17 @@ void TTEntry::save(
   Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, uint8_t generation8) {
 
     // Preserve the old ttmove if we don't have a new one
-    if (m || uint16_t(k) != key16)
+    if (m || key_t(k) != key16)
         move16 = m;
 
     // Overwrite less valuable entries (cheapest checks first)
-    if (b == BOUND_EXACT || uint16_t(k) != key16 || d - DEPTH_ENTRY_OFFSET + 2 * pv > depth8 - 4
+    if (b == BOUND_EXACT || key_t(k) != key16 || d - DEPTH_ENTRY_OFFSET + 2 * pv > depth8 - 4
         || relative_age(generation8))
     {
         assert(d > DEPTH_ENTRY_OFFSET);
         assert(d < 256 + DEPTH_ENTRY_OFFSET);
 
-        key16     = uint16_t(k);
+        key16     = key_t(k);
         depth8    = uint8_t(d - DEPTH_ENTRY_OFFSET);
         genBound8 = uint8_t(generation8 | uint8_t(pv) << 2 | b);
         value16   = int16_t(v);
@@ -143,10 +145,10 @@ static constexpr int ClusterSize = 3;
 
 struct Cluster {
     TTEntry entry[ClusterSize];
-    char    padding[2];  // Pad to 32 bytes
+    char    padding[40 - 3 * sizeof(key_t)];
 };
 
-static_assert(sizeof(Cluster) == 32, "Suboptimal Cluster size");
+static_assert(sizeof(Cluster) == 64, "Suboptimal Cluster size");
 
 
 // Sets the size of the transposition table,
@@ -155,7 +157,7 @@ static_assert(sizeof(Cluster) == 32, "Suboptimal Cluster size");
 void TranspositionTable::resize(size_t mbSize, ThreadPool& threads) {
     aligned_large_pages_free(table);
 
-    clusterCount = mbSize * 1024 * 1024 / sizeof(Cluster);
+    clusterCount = mbSize * 1024 * 1024 * 2 / sizeof(Cluster);
 
     table = static_cast<Cluster*>(aligned_large_pages_alloc(clusterCount * sizeof(Cluster)));
 
@@ -225,7 +227,7 @@ uint8_t TranspositionTable::generation() const { return generation8; }
 std::tuple<bool, TTData, TTWriter> TranspositionTable::probe(const Key key) const {
 
     TTEntry* const tte   = first_entry(key);
-    const uint16_t key16 = uint16_t(key);  // Use the low 16 bits as key inside the cluster
+    const key_t key16 = key_t(key);  // Use the low 16 bits as key inside the cluster
 
     for (int i = 0; i < ClusterSize; ++i)
         if (tte[i].key16 == key16)
