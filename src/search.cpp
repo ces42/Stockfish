@@ -796,7 +796,7 @@ Value Search::Worker::search(
     if (ss->inCheck)
     {
         // Skip early pruning when in check
-        ss->staticEval = eval = (ss - 2)->staticEval;
+        ss->staticEval = eval = -(ss-1)->staticEval - PieceValue[priorCapture] + 75;
         improving             = false;
         goto moves_loop;
     }
