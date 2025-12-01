@@ -878,7 +878,7 @@ void Position::do_move(Move                      m,
 
     // If en passant is impossible, then k will not change and we can prefetch earlier
     if (tt && !checkEP)
-        prefetch(tt->first_entry(adjust_key50(k)));
+        prefetch(tt->get_cluster(adjust_key50(k)));
 
     // Set capture piece
     st->capturedPiece = captured;
@@ -946,7 +946,7 @@ void Position::do_move(Move                      m,
     // Update the key with the final value
     st->key = k;
     if (tt)
-        prefetch(tt->first_entry(key()));
+        prefetch(tt->get_cluster(key()));
 
     // Calculate the repetition info. It is the ply distance from the previous
     // occurrence of the same position, negative in the 3-fold case, or zero
@@ -1275,7 +1275,7 @@ void Position::do_null_move(StateInfo& newSt, const TranspositionTable& tt) {
     }
 
     st->key ^= Zobrist::side;
-    prefetch(tt.first_entry(key()));
+    prefetch(tt.get_cluster(key()));
 
     st->pliesFromNull = 0;
 
