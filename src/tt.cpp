@@ -76,7 +76,7 @@ struct Cluster {
     TTEntry     entry[ClusterSize];
     uint64_t    keys;  // Pad to 32 bytes
 };
-constexpr int KEY_BITS = 16;
+constexpr int KEY_BITS = 21;
 constexpr uint64_t KEY_MASK = (1 << KEY_BITS) - 1;
 
 static_assert(sizeof(Cluster) == 32, "Suboptimal Cluster size");
@@ -234,7 +234,6 @@ std::tuple<bool, TTData, TTWriter> TranspositionTable::probe(const Key key) cons
     Cluster* const cluster   = get_cluster(key);
     TTEntry* tte = cluster->entry;
     const uint64_t key_bits = key & KEY_MASK;  // Use the low 16 bits as key inside the cluster
-    assert(key_bits == uint16_t(key));
 
     for (int i = 0; i < ClusterSize; ++i)
         if ( ((cluster->keys >> (KEY_BITS * i)) & KEY_MASK) == key_bits )
