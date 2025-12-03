@@ -713,15 +713,11 @@ Value Search::Worker::search(
         else
             eval = (ss - 2)->staticEval;
         unadjustedStaticEval = ss->staticEval = eval;
-        improving             = false;
-        opponentWorsening     = false;
     }
-    else
+    else if (excludedMove)
+        unadjustedStaticEval = eval = ss->staticEval;
+    else if (ss->ttHit)
     {
-        if (excludedMove)
-            unadjustedStaticEval = eval = ss->staticEval;
-        else if (ss->ttHit)
-        {
         // Never assume anything about values stored in TT
         unadjustedStaticEval = ttData.eval;
         if (!is_valid(unadjustedStaticEval))
@@ -733,26 +729,25 @@ Value Search::Worker::search(
         if (is_valid(ttData.value)
             && (ttData.bound & (ttData.value > eval ? BOUND_LOWER : BOUND_UPPER)))
             eval = ttData.value;
-        }
-        else
-        {
-            unadjustedStaticEval = evaluate(pos);
-            ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, correctionValue);
-
-            // Static evaluation is saved as it was before adjustment by correction history
-            ttWriter.write(posKey, VALUE_NONE, ss->ttPv, BOUND_NONE, DEPTH_UNSEARCHED, Move::none(),
-                           unadjustedStaticEval, tt.generation());
-        }
-
-        // Set up the improving flag, which is true if current static evaluation is
-        // bigger than the previous static evaluation at our turn (if we were in
-        // check at our previous move we go back until we weren't in check) and is
-        // false otherwise. The improving flag is used in various pruning heuristics.
-        // Similarly, opponentWorsening is true if our static evaluation is better
-        // for us than at the last ply.
-        improving         = ss->staticEval > (ss - 2)->staticEval;
-        opponentWorsening = ss->staticEval > -(ss - 1)->staticEval;
     }
+    else
+    {
+        unadjustedStaticEval = evaluate(pos);
+        ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, correctionValue);
+
+        // Static evaluation is saved as it was before adjustment by correction history
+        ttWriter.write(posKey, VALUE_NONE, ss->ttPv, BOUND_NONE, DEPTH_UNSEARCHED, Move::none(),
+                       unadjustedStaticEval, tt.generation());
+    }
+
+    // Set up the improving flag, which is true if current static evaluation is
+    // bigger than the previous static evaluation at our turn (if we were in
+    // check at our previous move we go back until we weren't in check) and is
+    // false otherwise. The improving flag is used in various pruning heuristics.
+    // Similarly, opponentWorsening is true if our static evaluation is better
+    // for us than at the last ply.
+    improving         = ss->staticEval > (ss - 2)->staticEval;
+    opponentWorsening = ss->staticEval > -(ss - 1)->staticEval;
 
     // Hindsight adjustment of reductions based on static evaluation difference.
     if (priorReduction >= 3 && !opponentWorsening)
