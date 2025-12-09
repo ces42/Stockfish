@@ -876,8 +876,8 @@ Value Search::Worker::search(
             Value futilityMult = 76 - 23 * !ss->ttHit;
 
             return futilityMult * d                               //
-                 - 2474 * improving * futilityMult / 1024         //
-                 - 331 * opponentWorsening * futilityMult / 1024  //
+                 - (2474 * improving * futilityMult >> 10)        //
+                 - (331 * opponentWorsening * futilityMult >> 10) //
                  + std::abs(correctionValue) / 174665;
         };
 
@@ -1052,7 +1052,7 @@ moves_loop:  // When in check, search starts here
                 mp.skip_quiet_moves();
 
             // Reduced depth of the next LMR search
-            int lmrDepth = newDepth - r / 1024;
+            int lmrDepth = newDepth - (r >> 10);
 
             if (capture || givesCheck)
             {
@@ -1228,7 +1228,7 @@ moves_loop:  // When in check, search starts here
             // beyond the first move depth.
             // To prevent problems when the max value is less than the min value,
             // std::clamp has been replaced by a more robust implementation.
-            Depth d = std::max(1, std::min(newDepth - r / 1024, newDepth + 2)) + PvNode;
+            Depth d = std::max(1, std::min(newDepth - (r / 1024), newDepth + 2)) + PvNode;
 
             ss->reduction = newDepth - d;
             value         = -search<NonPV>(pos, ss + 1, -(alpha + 1), -alpha, d, true);
@@ -1826,9 +1826,10 @@ void update_all_stats(const Position& pos,
     int bonus = std::min(116 * depth - 81, 1515) + 347 * (bestMove == ttMove);
     int malus = std::min(848 * depth - 207, 2446) - 17 * moveCount;
 
+
     if (!pos.capture_stage(bestMove))
     {
-        update_quiet_histories(pos, ss, workerThread, bestMove, bonus * 910 / 1024);
+        update_quiet_histories(pos, ss, workerThread, bestMove, bonus * 910 >> 10);
 
         // Decrease stats for all non-best quiet moves
         for (Move move : quietsSearched)
@@ -1838,7 +1839,7 @@ void update_all_stats(const Position& pos,
     {
         // Increase stats for the best move in case it was a capture move
         capturedPiece = type_of(pos.piece_on(bestMove.to_sq()));
-        captureHistory[movedPiece][bestMove.to_sq()][capturedPiece] << bonus * 1395 / 1024;
+        captureHistory[movedPiece][bestMove.to_sq()][capturedPiece] << (bonus * 1395 >> 10);
     }
 
     // Extra penalty for a quiet early move that was not a TT move in
