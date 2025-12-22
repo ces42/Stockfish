@@ -72,6 +72,20 @@ void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
         }
 }
 
+void partial_insertion_sort2(ExtMove* begin, ExtMove* end, int limit) {
+
+    for (ExtMove *sortedEnd = begin, *p = begin; p < end; ++p)
+        if (p->value >= limit)
+        {
+            ExtMove tmp = *p, *q;
+            *p          = *sortedEnd;
+            for (q = sortedEnd; q != begin && *(q - 1) < tmp; --q)
+                *q = *(q - 1);
+            ++sortedEnd;
+            *q = tmp;
+        }
+}
+
 }  // namespace
 
 
@@ -139,59 +153,82 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
         threatByLesser[KING]  = pos.attacks_by<QUEEN>(~us) | threatByLesser[QUEEN];
     }
 
-    ExtMove* it = cur;
-    for (auto move : ml)
-    {
-        ExtMove& m = *it++;
-        m          = move;
+    ExtMove* p = cur;
+    // ExtMove *sortedEnd = cur + 1;
+    ExtMove *sortedEnd = cur;
+    ExtMove *begin = cur;
+    const int limit = Type == QUIETS ? -3560 * depth : std::numeric_limits<int>::min();
 
-        const Square    from          = m.from_sq();
-        const Square    to            = m.to_sq();
-        const Piece     pc            = pos.moved_piece(m);
+    for (const auto& move : ml)
+    {
+        Value value;
+        // ExtMove m = move;
+
+        const Square    from          = move.from_sq();
+        const Square    to            = move.to_sq();
+        const Piece     pc            = pos.moved_piece(move);
         const PieceType pt            = type_of(pc);
         const Piece     capturedPiece = pos.piece_on(to);
 
         if constexpr (Type == CAPTURES)
-            m.value = (*captureHistory)[pc][to][type_of(capturedPiece)]
+            value = (*captureHistory)[pc][to][type_of(capturedPiece)]
                     + 7 * int(PieceValue[capturedPiece]);
 
         else if constexpr (Type == QUIETS)
         {
             // histories
-            m.value = 2 * (*mainHistory)[us][m.raw()];
-            m.value += 2 * (*pawnHistory)[pawn_history_index(pos)][pc][to];
-            m.value += (*continuationHistory[0])[pc][to];
-            m.value += (*continuationHistory[1])[pc][to];
-            m.value += (*continuationHistory[2])[pc][to];
-            m.value += (*continuationHistory[3])[pc][to];
-            m.value += (*continuationHistory[5])[pc][to];
+            value = 2 * (*mainHistory)[us][move.raw()];
+            value += 2 * (*pawnHistory)[pawn_history_index(pos)][pc][to];
+            value += (*continuationHistory[0])[pc][to];
+            value += (*continuationHistory[1])[pc][to];
+            value += (*continuationHistory[2])[pc][to];
+            value += (*continuationHistory[3])[pc][to];
+            value += (*continuationHistory[5])[pc][to];
 
             // bonus for checks
-            m.value += (bool(pos.check_squares(pt) & to) && pos.see_ge(m, -75)) * 16384;
+            value += (bool(pos.check_squares(pt) & to) && pos.see_ge(move, -75)) * 16384;
 
             // penalty for moving to a square threatened by a lesser piece
             // or bonus for escaping an attack by a lesser piece.
             int v = threatByLesser[pt] & to ? -19 : 20 * bool(threatByLesser[pt] & from);
-            m.value += PieceValue[pt] * v;
+            value += PieceValue[pt] * v;
 
 
             if (ply < LOW_PLY_HISTORY_SIZE)
-                m.value += 8 * (*lowPlyHistory)[ply][m.raw()] / (1 + ply);
+                value += 8 * (*lowPlyHistory)[ply][move.raw()] / (1 + ply);
         }
 
         else  // Type == EVASIONS
         {
-            if (pos.capture_stage(m))
-                m.value = PieceValue[capturedPiece] + (1 << 28);
+            if (pos.capture_stage(move))
+                value = PieceValue[capturedPiece] + (1 << 28);
             else
             {
-                m.value = (*mainHistory)[us][m.raw()] + (*continuationHistory[0])[pc][to];
+                value = (*mainHistory)[us][move.raw()] + (*continuationHistory[0])[pc][to];
                 if (ply < LOW_PLY_HISTORY_SIZE)
-                    m.value += (*lowPlyHistory)[ply][m.raw()];
+                    value += (*lowPlyHistory)[ply][move.raw()];
             }
         }
+        assert(p == cur || sortedEnd <= p);
+        if (value >= limit) {
+            if (p == cur)
+                assert(p == sortedEnd);
+            *p = *sortedEnd;
+            ExtMove *q = sortedEnd;
+            for (; q != begin && (q - 1)->value < value; --q)
+                *q = *(q - 1);
+            if (p == cur)
+                assert(q == cur);
+            *q = ExtMove(move, value);
+            // q->value = value;
+            sortedEnd++;
+        } else {
+            *p = ExtMove(move, value);
+            // p->value = value;
+        }
+        ++p;
     }
-    return it;
+    return p;
 }
 
 // Returns the next move satisfying a predicate function.
@@ -231,7 +268,7 @@ top:
         cur = endBadCaptures = moves;
         endCur = endCaptures = score<CAPTURES>(ml);
 
-        partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
+        // partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
         ++stage;
         goto top;
     }
@@ -255,7 +292,7 @@ top:
 
             endCur = endGenerated = score<QUIETS>(ml);
 
-            partial_insertion_sort(cur, endCur, -3560 * depth);
+            // partial_insertion_sort(cur, endCur, -3560 * depth);
         }
 
         ++stage;
@@ -295,7 +332,7 @@ top:
         cur    = moves;
         endCur = endGenerated = score<EVASIONS>(ml);
 
-        partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
+        // partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
         ++stage;
         [[fallthrough]];
     }
