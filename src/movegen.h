@@ -36,7 +36,7 @@ enum GenType {
     LEGAL
 };
 
-struct ExtMove: public Move {
+struct alignas(8) ExtMove: public Move {
     int value;
     ExtMove() = default;
 

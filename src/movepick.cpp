@@ -124,7 +124,7 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
 
     ExtMove *it, *sortedEnd, *begin;
     it = sortedEnd = begin = cur;
-    // const int limit = Type == QUIETS ? -3560 * depth : std::numeric_limits<int>::min();
+    const int limit = Type == QUIETS ? -3560 * depth : std::numeric_limits<int>::min();
 
     for (const auto& move : ml)
     {
@@ -155,14 +155,13 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
             // bonus for checks
             value += (bool(pos.check_squares(pt) & to) && pos.see_ge(move, -75)) * 16384;
 
+            if (ply < LOW_PLY_HISTORY_SIZE)
+                value += 8 * (*lowPlyHistory)[ply][move.raw()] / (1 + ply);
+
             // penalty for moving to a square threatened by a lesser piece
             // or bonus for escaping an attack by a lesser piece.
             int v = threatByLesser[pt] & to ? -19 : 20 * bool(threatByLesser[pt] & from);
             value += PieceValue[pt] * v;
-
-
-            if (ply < LOW_PLY_HISTORY_SIZE)
-                value += 8 * (*lowPlyHistory)[ply][move.raw()] / (1 + ply);
         }
 
         else  // Type == EVASIONS
@@ -177,17 +176,17 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
             }
         }
 
-        if (Type == QUIETS && value < -3560 * depth)
-            *(it++) = ExtMove(move, value);
+        if (Type == QUIETS && value < limit)
+            *it = ExtMove(move, value);
         else
         {
-            *(it++) = *sortedEnd;
+            *it = *sortedEnd;
             ExtMove *q = sortedEnd++;
             for (; q != begin && (q - 1)->value < value; --q)
                 *q = *(q - 1);
             *q = ExtMove(move, value);
         }
-
+        ++it;
     }
     return it;
 }
