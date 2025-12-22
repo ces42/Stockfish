@@ -19,7 +19,6 @@
 #include "movepick.h"
 
 #include <cassert>
-#include <limits>
 #include <utility>
 
 #include "bitboard.h"
@@ -55,36 +54,6 @@ enum Stages {
     QCAPTURE_INIT,
     QCAPTURE
 };
-
-
-// Sort moves in descending order up to and including a given limit.
-// The order of moves smaller than the limit is left unspecified.
-void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
-
-    for (ExtMove *sortedEnd = begin, *p = begin + 1; p < end; ++p)
-        if (p->value >= limit)
-        {
-            ExtMove tmp = *p, *q;
-            *p          = *++sortedEnd;
-            for (q = sortedEnd; q != begin && *(q - 1) < tmp; --q)
-                *q = *(q - 1);
-            *q = tmp;
-        }
-}
-
-void partial_insertion_sort2(ExtMove* begin, ExtMove* end, int limit) {
-
-    for (ExtMove *sortedEnd = begin, *p = begin; p < end; ++p)
-        if (p->value >= limit)
-        {
-            ExtMove tmp = *p, *q;
-            *p          = *sortedEnd;
-            for (q = sortedEnd; q != begin && *(q - 1) < tmp; --q)
-                *q = *(q - 1);
-            ++sortedEnd;
-            *q = tmp;
-        }
-}
 
 }  // namespace
 
@@ -153,11 +122,9 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
         threatByLesser[KING]  = pos.attacks_by<QUEEN>(~us) | threatByLesser[QUEEN];
     }
 
-    ExtMove* p = cur;
-    // ExtMove *sortedEnd = cur + 1;
-    ExtMove *sortedEnd = cur;
-    ExtMove *begin = cur;
-    const int limit = Type == QUIETS ? -3560 * depth : std::numeric_limits<int>::min();
+    ExtMove *it, *sortedEnd, *begin;
+    it = sortedEnd = begin = cur;
+    // const int limit = Type == QUIETS ? -3560 * depth : std::numeric_limits<int>::min();
 
     for (const auto& move : ml)
     {
@@ -209,26 +176,20 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
                     value += (*lowPlyHistory)[ply][move.raw()];
             }
         }
-        assert(p == cur || sortedEnd <= p);
-        if (value >= limit) {
-            if (p == cur)
-                assert(p == sortedEnd);
-            *p = *sortedEnd;
-            ExtMove *q = sortedEnd;
+
+        if (Type == QUIETS && value < -3560 * depth)
+            *(it++) = ExtMove(move, value);
+        else
+        {
+            *(it++) = *sortedEnd;
+            ExtMove *q = sortedEnd++;
             for (; q != begin && (q - 1)->value < value; --q)
                 *q = *(q - 1);
-            if (p == cur)
-                assert(q == cur);
             *q = ExtMove(move, value);
-            // q->value = value;
-            sortedEnd++;
-        } else {
-            *p = ExtMove(move, value);
-            // p->value = value;
         }
-        ++p;
+
     }
-    return p;
+    return it;
 }
 
 // Returns the next move satisfying a predicate function.
@@ -268,7 +229,6 @@ top:
         cur = endBadCaptures = moves;
         endCur = endCaptures = score<CAPTURES>(ml);
 
-        // partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
         ++stage;
         goto top;
     }
@@ -291,8 +251,6 @@ top:
             MoveList<QUIETS> ml(pos);
 
             endCur = endGenerated = score<QUIETS>(ml);
-
-            // partial_insertion_sort(cur, endCur, -3560 * depth);
         }
 
         ++stage;
@@ -332,7 +290,6 @@ top:
         cur    = moves;
         endCur = endGenerated = score<EVASIONS>(ml);
 
-        // partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
         ++stage;
         [[fallthrough]];
     }

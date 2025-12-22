@@ -44,9 +44,6 @@ struct ExtMove: public Move {
         Move(m),
         value(v) {};
 
-
-    void operator=(const Move m) { data = m.raw(); }
-
     // Inhibit unwanted implicit conversions to Move
     // with an ambiguity that yields to a compile error.
     operator float() const = delete;
