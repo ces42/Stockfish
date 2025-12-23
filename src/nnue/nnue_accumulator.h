@@ -60,9 +60,8 @@ struct alignas(CacheLineSize) Accumulator {
 // is commonly referred to as "Finny Tables".
 struct AccumulatorCaches {
 
-    template<typename Networks>
-    AccumulatorCaches(const Networks& networks) {
-        clear(networks);
+    AccumulatorCaches() {
+        clear();
     }
 
     template<IndexType Size>
@@ -76,16 +75,15 @@ struct AccumulatorCaches {
 
             // To initialize a refresh entry, we set all its bitboards empty,
             // so we put the biases in the accumulation, without any weights on top
-            void clear(const std::array<BiasType, Size>& biases) {
-                std::memset(accumulation, 0, sizeof(Entry));
+            void clear() {
+                std::memset(this, 0, sizeof(Entry));
             }
         };
 
-        template<typename Network>
-        void clear(const Network& network) {
+        void clear() {
             for (auto& entries1D : entries)
                 for (auto& entry : entries1D)
-                    entry.clear(network.featureTransformer.biases);
+                    entry.clear();
         }
 
         std::array<Entry, COLOR_NB>& operator[](Square sq) { return entries[sq]; }
@@ -93,10 +91,9 @@ struct AccumulatorCaches {
         std::array<std::array<Entry, COLOR_NB>, SQUARE_NB> entries;
     };
 
-    template<typename Networks>
-    void clear(const Networks& networks) {
-        big.clear(networks.big);
-        small.clear(networks.small);
+    void clear() {
+        big.clear();
+        small.clear();
     }
 
     Cache<TransformedFeatureDimensionsBig>   big;

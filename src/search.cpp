@@ -164,7 +164,7 @@ Search::Worker::Worker(SharedState&                    sharedState,
     threads(sharedState.threads),
     tt(sharedState.tt),
     networks(sharedState.networks),
-    refreshTable(networks[token]) {
+    refreshTable() {
     clear();
 }
 
@@ -595,7 +595,7 @@ void Search::Worker::clear() {
     for (size_t i = 1; i < reductions.size(); ++i)
         reductions[i] = int(2747 / 128.0 * std::log(i));
 
-    refreshTable.clear(networks[numaAccessToken]);
+    refreshTable.clear();
 }
 
 
