@@ -230,11 +230,7 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
             if (pos.capture_stage(m))
                 m.value = PieceValue[capturedPiece] + (1 << 28);
             else
-            {
                 m.value = (*mainHistory)[us][m.raw()] + (*continuationHistory[0])[pc][to];
-                if (ply < LOW_PLY_HISTORY_SIZE)
-                    m.value += (*lowPlyHistory)[ply][m.raw()];
-            }
         }
     }
     return it;
@@ -245,7 +241,7 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
 template<typename Pred>
 Move MovePicker::select(Pred filter) {
 
-    for (; cur < endMoves; ++cur)
+    for (; cur < endCur; ++cur)
         if (*cur != ttMove && *cur != ttMove2 && filter())
             return *cur++;
 
