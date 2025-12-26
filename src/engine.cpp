@@ -18,6 +18,7 @@
 
 #include "engine.h"
 
+#include <algorithm>
 #include <cassert>
 #include <deque>
 #include <iosfwd>
@@ -32,9 +33,12 @@
 #include "misc.h"
 #include "nnue/network.h"
 #include "nnue/nnue_common.h"
+#include "nnue/nnue_misc.h"
+#include "numa.h"
 #include "perft.h"
 #include "position.h"
 #include "search.h"
+#include "shm.h"
 #include "syzygy/tbprobe.h"
 #include "types.h"
 #include "uci.h"
@@ -44,8 +48,9 @@ namespace Stockfish {
 
 namespace NN = Eval::NNUE;
 
-constexpr auto StartFEN  = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-constexpr int  MaxHashMB = Is64Bit ? 33554432 : 2048;
+constexpr auto StartFEN   = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+constexpr int  MaxHashMB  = Is64Bit ? 33554432 : 2048;
+int            MaxThreads = std::max(1024, 4 * int(get_hardware_concurrency()));
 
 Engine::Engine(std::optional<std::string> path) :
     binaryDirectory(path ? CommandLine::get_binary_directory(*path) : ""),
@@ -54,62 +59,91 @@ Engine::Engine(std::optional<std::string> path) :
     threads(),
     networks(
       numaContext,
-      NN::Networks(
-        NN::NetworkBig({EvalFileDefaultNameBig, "None", ""}, NN::EmbeddedNNUEType::BIG),
-        NN::NetworkSmall({EvalFileDefaultNameSmall, "None", ""}, NN::EmbeddedNNUEType::SMALL))) {
+      // Heap-allocate because sizeof(NN::Networks) is large
+      std::make_unique<NN::Networks>(
+        std::make_unique<NN::NetworkBig>(NN::EvalFile{EvalFileDefaultNameBig, "None", ""},
+                                         NN::EmbeddedNNUEType::BIG),
+        std::make_unique<NN::NetworkSmall>(NN::EvalFile{EvalFileDefaultNameSmall, "None", ""},
+                                           NN::EmbeddedNNUEType::SMALL))) {
+
     pos.set(StartFEN, false, &states->back());
 
-    options["Debug Log File"] << Option("", [](const Option& o) {
-        start_logger(o);
-        return std::nullopt;
-    });
+    options.add(  //
+      "Debug Log File", Option("", [](const Option& o) {
+          start_logger(o);
+          return std::nullopt;
+      }));
 
-    options["NumaPolicy"] << Option("auto", [this](const Option& o) {
-        set_numa_config_from_option(o);
-        return numa_config_information_as_string() + "\n"
-             + thread_allocation_information_as_string();
-    });
+    options.add(  //
+      "NumaPolicy", Option("auto", [this](const Option& o) {
+          set_numa_config_from_option(o);
+          return numa_config_information_as_string() + "\n"
+               + thread_allocation_information_as_string();
+      }));
 
-    options["Threads"] << Option(1, 1, 1024, [this](const Option&) {
-        resize_threads();
-        return thread_allocation_information_as_string();
-    });
+    options.add(  //
+      "Threads", Option(1, 1, MaxThreads, [this](const Option&) {
+          resize_threads();
+          return thread_allocation_information_as_string();
+      }));
 
-    options["Hash"] << Option(16, 1, MaxHashMB, [this](const Option& o) {
-        set_tt_size(o);
-        return std::nullopt;
-    });
+    options.add(  //
+      "Hash", Option(16, 1, MaxHashMB, [this](const Option& o) {
+          set_tt_size(o);
+          return std::nullopt;
+      }));
 
-    options["Clear Hash"] << Option([this](const Option&) {
-        search_clear();
-        return std::nullopt;
-    });
-    options["Ponder"] << Option(false);
-    options["MultiPV"] << Option(1, 1, MAX_MOVES);
-    options["Skill Level"] << Option(20, 0, 20);
-    options["Move Overhead"] << Option(10, 0, 5000);
-    options["nodestime"] << Option(0, 0, 10000);
-    options["UCI_Chess960"] << Option(false);
-    options["UCI_LimitStrength"] << Option(false);
-    options["UCI_Elo"] << Option(Stockfish::Search::Skill::LowestElo,
-                                 Stockfish::Search::Skill::LowestElo,
-                                 Stockfish::Search::Skill::HighestElo);
-    options["UCI_ShowWDL"] << Option(false);
-    options["SyzygyPath"] << Option("", [](const Option& o) {
-        Tablebases::init(o);
-        return std::nullopt;
-    });
-    options["SyzygyProbeDepth"] << Option(1, 1, 100);
-    options["Syzygy50MoveRule"] << Option(true);
-    options["SyzygyProbeLimit"] << Option(7, 0, 7);
-    options["EvalFile"] << Option(EvalFileDefaultNameBig, [this](const Option& o) {
-        load_big_network(o);
-        return std::nullopt;
-    });
-    options["EvalFileSmall"] << Option(EvalFileDefaultNameSmall, [this](const Option& o) {
-        load_small_network(o);
-        return std::nullopt;
-    });
+    options.add(  //
+      "Clear Hash", Option([this](const Option&) {
+          search_clear();
+          return std::nullopt;
+      }));
+
+    options.add(  //
+      "Ponder", Option(false));
+
+    options.add(  //
+      "MultiPV", Option(1, 1, MAX_MOVES));
+
+    options.add("Skill Level", Option(20, 0, 20));
+
+    options.add("Move Overhead", Option(10, 0, 5000));
+
+    options.add("nodestime", Option(0, 0, 10000));
+
+    options.add("UCI_Chess960", Option(false));
+
+    options.add("UCI_LimitStrength", Option(false));
+
+    options.add("UCI_Elo",
+                Option(Stockfish::Search::Skill::LowestElo, Stockfish::Search::Skill::LowestElo,
+                       Stockfish::Search::Skill::HighestElo));
+
+    options.add("UCI_ShowWDL", Option(false));
+
+    options.add(  //
+      "SyzygyPath", Option("", [](const Option& o) {
+          Tablebases::init(o);
+          return std::nullopt;
+      }));
+
+    options.add("SyzygyProbeDepth", Option(1, 1, 100));
+
+    options.add("Syzygy50MoveRule", Option(true));
+
+    options.add("SyzygyProbeLimit", Option(7, 0, 7));
+
+    options.add(  //
+      "EvalFile", Option(EvalFileDefaultNameBig, [this](const Option& o) {
+          load_big_network(o);
+          return std::nullopt;
+      }));
+
+    options.add(  //
+      "EvalFileSmall", Option(EvalFileDefaultNameSmall, [this](const Option& o) {
+          load_small_network(o);
+          return std::nullopt;
+      }));
 
     load_networks();
     resize_threads();
@@ -225,6 +259,36 @@ void Engine::set_ponderhit(bool b) { threads.main_manager()->ponder = b; }
 void Engine::verify_networks() const {
     networks->big.verify(options["EvalFile"], onVerifyNetworks);
     networks->small.verify(options["EvalFileSmall"], onVerifyNetworks);
+
+    auto statuses = networks.get_status_and_errors();
+    for (size_t i = 0; i < statuses.size(); ++i)
+    {
+        const auto [status, error] = statuses[i];
+        std::string message        = "Network replica " + std::to_string(i + 1) + ": ";
+        if (status == SystemWideSharedConstantAllocationStatus::NoAllocation)
+        {
+            message += "No allocation.";
+        }
+        else if (status == SystemWideSharedConstantAllocationStatus::LocalMemory)
+        {
+            message += "Local memory.";
+        }
+        else if (status == SystemWideSharedConstantAllocationStatus::SharedMemory)
+        {
+            message += "Shared memory.";
+        }
+        else
+        {
+            message += "Unknown status.";
+        }
+
+        if (error.has_value())
+        {
+            message += " " + *error;
+        }
+
+        onVerifyNetworks(message);
+    }
 }
 
 void Engine::load_networks() {
@@ -340,5 +404,4 @@ std::string Engine::thread_allocation_information_as_string() const {
 
     return ss.str();
 }
-
 }

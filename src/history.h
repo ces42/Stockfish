@@ -33,38 +33,30 @@
 
 namespace Stockfish {
 
-constexpr int PAWN_HISTORY_SIZE        = 512;    // has to be a power of 2
-constexpr int CORRECTION_HISTORY_SIZE  = 32768;  // has to be a power of 2
+constexpr int PAWN_HISTORY_SIZE        = 8192;  // has to be a power of 2
+constexpr int UINT_16_HISTORY_SIZE     = std::numeric_limits<uint16_t>::max() + 1;
 constexpr int CORRECTION_HISTORY_LIMIT = 1024;
-constexpr int LOW_PLY_HISTORY_SIZE     = 4;
+constexpr int LOW_PLY_HISTORY_SIZE     = 5;
 
 static_assert((PAWN_HISTORY_SIZE & (PAWN_HISTORY_SIZE - 1)) == 0,
               "PAWN_HISTORY_SIZE has to be a power of 2");
 
-static_assert((CORRECTION_HISTORY_SIZE & (CORRECTION_HISTORY_SIZE - 1)) == 0,
+static_assert((UINT_16_HISTORY_SIZE & (UINT_16_HISTORY_SIZE - 1)) == 0,
               "CORRECTION_HISTORY_SIZE has to be a power of 2");
 
-enum PawnHistoryType {
-    Normal,
-    Correction
-};
-
-template<PawnHistoryType T = Normal>
-inline int pawn_structure_index(const Position& pos) {
-    return pos.pawn_key() & ((T == Normal ? PAWN_HISTORY_SIZE : CORRECTION_HISTORY_SIZE) - 1);
+inline int pawn_history_index(const Position& pos) {
+    return pos.pawn_key() & (PAWN_HISTORY_SIZE - 1);
 }
 
-inline int major_piece_index(const Position& pos) {
-    return pos.major_piece_key() & (CORRECTION_HISTORY_SIZE - 1);
+inline uint16_t pawn_correction_history_index(const Position& pos) {
+    return uint16_t(pos.pawn_key());
 }
 
-inline int minor_piece_index(const Position& pos) {
-    return pos.minor_piece_key() & (CORRECTION_HISTORY_SIZE - 1);
-}
+inline uint16_t minor_piece_index(const Position& pos) { return uint16_t(pos.minor_piece_key()); }
 
 template<Color c>
-inline int non_pawn_index(const Position& pos) {
-    return pos.non_pawn_key(c) & (CORRECTION_HISTORY_SIZE - 1);
+inline uint16_t non_pawn_index(const Position& pos) {
+    return uint16_t(pos.non_pawn_key(c));
 }
 
 // StatsEntry is the container of various numerical statistics. We use a class
@@ -75,7 +67,7 @@ inline int non_pawn_index(const Position& pos) {
 template<typename T, int D>
 class StatsEntry {
 
-    static_assert(std::is_arithmetic<T>::value, "Not an arithmetic type");
+    static_assert(std::is_arithmetic_v<T>, "Not an arithmetic type");
     static_assert(D <= std::numeric_limits<T>::max(), "D overflows T");
 
     T entry;
@@ -107,13 +99,12 @@ using Stats = MultiArray<StatsEntry<T, D>, Sizes...>;
 // ButterflyHistory records how often quiet moves have been successful or unsuccessful
 // during the current search, and is used for reduction and move ordering decisions.
 // It uses 2 tables (one for each color) indexed by the move's from and to squares,
-// see https://www.chessprogramming.org/Butterfly_Boards (~11 elo)
-using ButterflyHistory = Stats<std::int16_t, 7183, COLOR_NB, int(SQUARE_NB) * int(SQUARE_NB)>;
+// see https://www.chessprogramming.org/Butterfly_Boards
+using ButterflyHistory = Stats<std::int16_t, 7183, COLOR_NB, UINT_16_HISTORY_SIZE>;
 
-// LowPlyHistory is adressed by play and move's from and to squares, used
+// LowPlyHistory is addressed by ply and move's from and to squares, used
 // to improve move ordering near the root
-using LowPlyHistory =
-  Stats<std::int16_t, 7183, LOW_PLY_HISTORY_SIZE, int(SQUARE_NB) * int(SQUARE_NB)>;
+using LowPlyHistory = Stats<std::int16_t, 7183, LOW_PLY_HISTORY_SIZE, UINT_16_HISTORY_SIZE>;
 
 // CapturePieceToHistory is addressed by a move's [piece][to][captured piece type]
 using CapturePieceToHistory = Stats<std::int16_t, 10692, PIECE_NB, SQUARE_NB, PIECE_TYPE_NB>;
@@ -124,7 +115,6 @@ using PieceToHistory = Stats<std::int16_t, 30000, PIECE_NB, SQUARE_NB>;
 // ContinuationHistory is the combined history of a given pair of moves, usually
 // the current one given a previous one. The nested history table is based on
 // PieceToHistory instead of ButterflyBoards.
-// (~63 elo)
 using ContinuationHistory = MultiArray<PieceToHistory, PIECE_NB, SQUARE_NB>;
 
 // PawnHistory is addressed by the pawn structure and a move's [piece][to]
@@ -136,18 +126,17 @@ using PawnHistory = Stats<std::int16_t, 8192, PAWN_HISTORY_SIZE, PIECE_NB, SQUAR
 // see https://www.chessprogramming.org/Static_Evaluation_Correction_History
 enum CorrHistType {
     Pawn,          // By color and pawn structure
-    Major,         // By color and positions of major pieces (Queen, Rook) and King
-    Minor,         // By color and positions of minor pieces (Knight, Bishop) and King
-    NonPawn,       // By color and non-pawn material positions
+    Minor,         // By color and positions of minor pieces (Knight, Bishop)
+    NonPawn,       // By non-pawn material positions and color
     PieceTo,       // By [piece][to] move
     Continuation,  // Combined history of move pairs
 };
 
 namespace Detail {
 
-template<CorrHistType _>
+template<CorrHistType>
 struct CorrHistTypedef {
-    using type = Stats<std::int16_t, CORRECTION_HISTORY_LIMIT, COLOR_NB, CORRECTION_HISTORY_SIZE>;
+    using type = Stats<std::int16_t, CORRECTION_HISTORY_LIMIT, UINT_16_HISTORY_SIZE, COLOR_NB>;
 };
 
 template<>
@@ -160,10 +149,18 @@ struct CorrHistTypedef<Continuation> {
     using type = MultiArray<CorrHistTypedef<PieceTo>::type, PIECE_NB, SQUARE_NB>;
 };
 
+template<>
+struct CorrHistTypedef<NonPawn> {
+    using type =
+      Stats<std::int16_t, CORRECTION_HISTORY_LIMIT, UINT_16_HISTORY_SIZE, COLOR_NB, COLOR_NB>;
+};
+
 }
 
 template<CorrHistType T>
 using CorrectionHistory = typename Detail::CorrHistTypedef<T>::type;
+
+using TTMoveHistory = StatsEntry<std::int16_t, 8192>;
 
 }  // namespace Stockfish
 

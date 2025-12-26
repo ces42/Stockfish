@@ -54,10 +54,10 @@ class MovePicker {
    private:
     template<typename Pred>
     Move select(Pred);
-    template<GenType>
-    void     score();
+    template<GenType T>
+    ExtMove* score(MoveList<T>&);
     ExtMove* begin() { return cur; }
-    ExtMove* end() { return endMoves; }
+    ExtMove* end() { return endCur; }
 
     const Position&              pos;
     const ButterflyHistory*      mainHistory;
@@ -67,7 +67,7 @@ class MovePicker {
     const PawnHistory*           pawnHistory;
     Move                         ttMove;
     Move                         ttMove2;
-    ExtMove *                    cur, *endMoves, *endBadCaptures, *beginBadQuiets, *endBadQuiets;
+    ExtMove *                    cur, *endCur, *endBadCaptures, *endCaptures, *endGenerated;
     int                          stage;
     int                          threshold;
     Depth                        depth;

@@ -44,7 +44,7 @@ constexpr std::string_view version = "dev";
 
 // Our fancy logging facility. The trick here is to replace cin.rdbuf() and
 // cout.rdbuf() with two Tie objects that tie cin and cout to a file stream. We
-// can toggle the logging of std::cout and std:cin at runtime whilst preserving
+// can toggle the logging of std::cout and std::cin at runtime whilst preserving
 // usual I/O functionality, all without changing a single line of code!
 // Idea from http://groups.google.com/group/comp.lang.c++/msg/1d941c0f26ea0d81
 
@@ -237,6 +237,9 @@ std::string compiler_info() {
 
     compiler += "\nCompilation settings       : ";
     compiler += (Is64Bit ? "64bit" : "32bit");
+#if defined(USE_AVX512ICL)
+    compiler += " AVX512ICL";
+#endif
 #if defined(USE_VNNI)
     compiler += " VNNI";
 #endif
@@ -256,12 +259,12 @@ std::string compiler_info() {
 #if defined(USE_SSE2)
     compiler += " SSE2";
 #endif
-    compiler += (HasPopCnt ? " POPCNT" : "");
 #if defined(USE_NEON_DOTPROD)
     compiler += " NEON_DOTPROD";
 #elif defined(USE_NEON)
     compiler += " NEON";
 #endif
+    compiler += (HasPopCnt ? " POPCNT" : "");
 
 #if !defined(NDEBUG)
     compiler += " DEBUG";
@@ -287,11 +290,17 @@ namespace {
 
 template<size_t N>
 struct DebugInfo {
-    std::atomic<int64_t> data[N] = {0};
+    std::array<std::atomic<int64_t>, N> data = {0};
 
     [[nodiscard]] constexpr std::atomic<int64_t>& operator[](size_t index) {
         assert(index < N);
         return data[index];
+    }
+
+    constexpr DebugInfo& operator=(const DebugInfo& other) {
+        for (size_t i = 0; i < N; i++)
+            data[i].store(other.data[i].load());
+        return *this;
     }
 };
 
@@ -393,6 +402,13 @@ void dbg_print() {
         }
 }
 
+void dbg_clear() {
+    hit.fill({});
+    mean.fill({});
+    stdev.fill({});
+    correl.fill({});
+    extremes.fill({});
+}
 
 // Used to serialize access to std::cout
 // to avoid multiple threads writing at the same time.
