@@ -50,10 +50,10 @@ struct TTEntry {
 
     // Convert internal bitfields to external types
     TTData read() const {
-        return TTData{Move(move16),           Value(value16),
+        return TTData{Move(move16),           Move(move2_16),
+                      Value(value16),
                       Value(eval16),          Depth(depth8 + DEPTH_ENTRY_OFFSET),
-                      Bound(genBound8 & 0x3), bool(genBound8 & 0x4),
-                      Move(move2_16)};
+                      Bound(genBound8 & 0x3), bool(genBound8 & 0x4)};
     }
 
     bool is_occupied() const;
@@ -251,7 +251,7 @@ std::tuple<bool, TTData, TTWriter> TranspositionTable::probe(const Key key) cons
             replace = &tte[i];
 
     return {false,
-            TTData{Move::none(), VALUE_NONE, VALUE_NONE, DEPTH_ENTRY_OFFSET, BOUND_NONE, false},
+            TTData{Move::none(), Move::none(), VALUE_NONE, VALUE_NONE, DEPTH_ENTRY_OFFSET, BOUND_NONE, false},
             TTWriter(replace)};
 }
 
