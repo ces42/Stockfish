@@ -38,11 +38,6 @@ enum GenType {
 
 struct alignas(8) ExtMove: public Move {
     int value;
-    ExtMove() = default;
-
-    ExtMove(Move m, int v) :
-        Move(m),
-        value(v) {};
 
     // Inhibit unwanted implicit conversions to Move
     // with an ambiguity that yields to a compile error.

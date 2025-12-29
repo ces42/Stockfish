@@ -124,7 +124,7 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
 
     ExtMove *it, *sortedEnd, *begin;
     it = sortedEnd = begin = cur;
-    const int limit = Type == QUIETS ? -3560 * depth : std::numeric_limits<int>::min();
+    const int limit = -3560 * depth;
 
     for (const auto& move : ml)
     {
@@ -173,14 +173,14 @@ ExtMove* MovePicker::score(MoveList<Type>& ml) {
         }
 
         if (Type == QUIETS && value < limit)
-            *it = ExtMove(move, value);
+            *it = { move, value };
         else
         {
             *it = *sortedEnd;
             ExtMove *q = sortedEnd++;
             for (; q != begin && (q - 1)->value < value; --q)
                 *q = *(q - 1);
-            *q = ExtMove(move, value);
+            *q = { move, value };
         }
         ++it;
     }
