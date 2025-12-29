@@ -105,7 +105,7 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
 // Captures are ordered by Most Valuable Victim (MVV), preferring captures
 // with a good history. Quiets moves are ordered using the history tables.
 template<GenType Type>
-ExtMove* MovePicker::score(MoveList<Type>& ml) {
+ExtMove* MovePicker::score_and_sort(MoveList<Type>& ml) {
 
     static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong type");
 
@@ -222,7 +222,7 @@ top:
         MoveList<CAPTURES> ml(pos);
 
         cur = endBadCaptures = moves;
-        endCur = endCaptures = score<CAPTURES>(ml);
+        endCur = endCaptures = score_and_sort<CAPTURES>(ml);
 
         ++stage;
         goto top;
@@ -245,7 +245,7 @@ top:
         {
             MoveList<QUIETS> ml(pos);
 
-            endCur = endGenerated = score<QUIETS>(ml);
+            endCur = endGenerated = score_and_sort<QUIETS>(ml);
         }
 
         ++stage;
@@ -283,7 +283,7 @@ top:
         MoveList<EVASIONS> ml(pos);
 
         cur    = moves;
-        endCur = endGenerated = score<EVASIONS>(ml);
+        endCur = endGenerated = score_and_sort<EVASIONS>(ml);
 
         ++stage;
         [[fallthrough]];
