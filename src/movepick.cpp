@@ -97,7 +97,8 @@ MovePicker::MovePicker(const Position&              p,
     sharedHistory(sh),
     ttMove(ttm),
     depth(d),
-    ply(pl) {
+    ply(pl),
+    goodQuietThreshold(std::min(-14000, -3500 * d)) {
 
     if (pos.checkers())
         stage = EVASION_TT + !(ttm && pos.pseudo_legal(ttm));
@@ -206,8 +207,6 @@ Move MovePicker::select(Pred filter) {
 // new pseudo-legal move on every call until there are no more moves left,
 // picking the move with the highest score from a list of generated moves.
 Move MovePicker::next_move() {
-
-    constexpr int goodQuietThreshold = -14000;
 top:
     switch (stage)
     {
@@ -251,7 +250,7 @@ top:
 
             endCur = endGenerated = score<QUIETS>(ml);
 
-            partial_insertion_sort(cur, endCur, std::max(-3560 * depth, goodQuietThreshold));
+            partial_insertion_sort(cur, endCur, -3560 * depth);
         }
 
         ++stage;
