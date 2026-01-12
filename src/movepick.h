@@ -27,6 +27,13 @@ namespace Stockfish {
 
 class Position;
 
+enum MPType {
+    MAIN_MP,
+    EVASION,
+    QSEARCH,
+    PROBCUT,
+};
+
 // The MovePicker class is used to pick one pseudo-legal move at a time from the
 // current position. The most important method is next_move(), which emits one
 // new pseudo-legal move on every call, until there are no moves left, when
@@ -71,6 +78,7 @@ class MovePicker {
     int                          threshold;
     Depth                        depth;
     int                          ply;
+    MPType                       type;
     bool                         skipQuiets = false;
     ExtMove                      moves[MAX_MOVES];
 };

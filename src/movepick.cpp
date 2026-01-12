@@ -31,28 +31,18 @@ namespace Stockfish {
 namespace {
 
 enum Stages {
-    // generate main search moves
-    MAIN_TT,
-    CAPTURE_INIT,
-    GOOD_CAPTURE,
+    TT = 0,
+    CAPTURE_INIT = 1,
+    GOOD_CAPTURE = 2,
     GOOD_QUIET,
     BAD_CAPTURE,
     BAD_QUIET,
 
     // generate evasion moves
-    EVASION_TT,
     EVASION_INIT,
-    EVASION,
 
-    // generate probcut moves
-    PROBCUT_TT,
-    PROBCUT_INIT,
-    PROBCUT,
-
-    // generate qsearch moves
-    QSEARCH_TT,
-    QCAPTURE_INIT,
-    QCAPTURE
+    JUST_YIELD,
+    YIELD_PROBCUT,
 };
 
 
@@ -99,10 +89,15 @@ MovePicker::MovePicker(const Position&              p,
     ply(pl) {
 
     if (pos.checkers())
-        stage = EVASION_TT + !(ttm && pos.pseudo_legal(ttm));
-
+    {
+        type = EVASION;
+        stage = !(ttm && pos.pseudo_legal(ttm));
+    }
     else
-        stage = (depth > 0 ? MAIN_TT : QSEARCH_TT) + !(ttm && pos.pseudo_legal(ttm));
+    {
+        type = depth > 0 ? MAIN_MP : QSEARCH;
+        stage = !(ttm && pos.pseudo_legal(ttm));
+    }
 }
 
 // MovePicker constructor for ProbCut: we generate captures with Static Exchange
@@ -114,7 +109,8 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
     threshold(th) {
     assert(!pos.checkers());
 
-    stage = PROBCUT_TT + !(ttm && pos.capture_stage(ttm) && pos.pseudo_legal(ttm));
+    type = PROBCUT;
+    stage = !(ttm && pos.capture_stage(ttm) && pos.pseudo_legal(ttm));
 }
 
 // Assigns a numerical value to each move in a list, used for sorting.
@@ -211,23 +207,25 @@ top:
     switch (stage)
     {
 
-    case MAIN_TT :
-    case EVASION_TT :
-    case QSEARCH_TT :
-    case PROBCUT_TT :
-        ++stage;
+    case TT :
+        stage = type != EVASION ? CAPTURE_INIT : EVASION_INIT;
         return ttMove;
 
     case CAPTURE_INIT :
-    case PROBCUT_INIT :
-    case QCAPTURE_INIT : {
+    {
         MoveList<CAPTURES> ml(pos);
 
         cur = endBadCaptures = moves;
         endCur = endCaptures = score<CAPTURES>(ml);
 
         partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
-        ++stage;
+
+        if (type == MAIN_MP)
+            stage = GOOD_CAPTURE;
+        else if (type == QSEARCH)
+            stage = JUST_YIELD;
+        else
+            stage = YIELD_PROBCUT;
         goto top;
     }
 
@@ -240,25 +238,26 @@ top:
             }))
             return *(cur - 1);
 
-        ++stage;
         if (!skipQuiets)
         {
-            {
-                MoveList<QUIETS> ml(pos);
-                endCur = endGenerated = score<QUIETS>(ml);
-            }
+            MoveList<QUIETS> ml(pos);
+
+            endCur = endGenerated = score<QUIETS>(ml);
 
             partial_insertion_sort(cur, endCur, -3560 * depth);
+        }
 
-            [[fallthrough]];
+        ++stage;
+        [[fallthrough]];
 
     case GOOD_QUIET :
-            return select([&]() { return cur->value > goodQuietThreshold; });
+        if (!skipQuiets && select([&]() { return cur->value > goodQuietThreshold; }))
+            return *(cur - 1);
 
-        }
         // Prepare the pointers to loop over the bad captures
         cur    = moves;
         endCur = endBadCaptures;
+
         ++stage;
         [[fallthrough]];
 
@@ -286,15 +285,14 @@ top:
         endCur = endGenerated = score<EVASIONS>(ml);
 
         partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
-        ++stage;
+        stage = JUST_YIELD;
         [[fallthrough]];
     }
 
-    case EVASION :
-    case QCAPTURE :
+    case JUST_YIELD :
         return select([]() { return true; });
 
-    case PROBCUT :
+    case YIELD_PROBCUT :
         return select([&]() { return pos.see_ge(*cur, threshold); });
 
     default:
@@ -302,13 +300,6 @@ top:
     }
 }
 
-void MovePicker::skip_quiet_moves() {
-    skipQuiets = true;
-    if (stage == GOOD_QUIET){
-        ++stage;
-        cur = moves;
-        endCur = endBadCaptures;
-    }
-}
+void MovePicker::skip_quiet_moves() { skipQuiets = true; }
 
 }  // namespace Stockfish
