@@ -30,6 +30,25 @@ namespace Stockfish {
 
 namespace {
 
+enum Stages {
+    TT = 0,
+    FIRST_STAGE_INIT = 1,
+
+    GOOD_CAPTURE,
+    GOOD_QUIET,
+    BAD_CAPTURE,
+    BAD_QUIET,
+
+    EVASION_INIT,
+
+    QSEARCH,
+
+    EVASION,
+
+    PROBCUT,
+};
+
+
 
 // Sort moves in descending order up to and including a given limit.
 // The order of moves smaller than the limit is left unspecified.
@@ -104,7 +123,7 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
 template<GenType Type>
 ExtMove* MovePicker::score(MoveList<Type>& ml) {
 
-    static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong first_stage");
+    static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong type");
 
     Color us = pos.side_to_move();
 
@@ -270,6 +289,7 @@ dispatch:
         return select([&]() { return pos.see_ge(*cur, threshold); });
 
     default:
+        assert(false);
         __builtin_unreachable();
     }
 }

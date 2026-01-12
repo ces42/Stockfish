@@ -27,23 +27,6 @@ namespace Stockfish {
 
 class Position;
 
-enum Stages {
-    TT = 0,
-    FIRST_STAGE_INIT = 1,
-
-    GOOD_CAPTURE,
-    GOOD_QUIET,
-    BAD_CAPTURE,
-    BAD_QUIET,
-
-    // generate evasion moves
-    EVASION_INIT,
-
-    QSEARCH,
-    EVASION,
-    PROBCUT,
-};
-
 // The MovePicker class is used to pick one pseudo-legal move at a time from the
 // current position. The most important method is next_move(), which emits one
 // new pseudo-legal move on every call, until there are no moves left, when
@@ -85,7 +68,7 @@ class MovePicker {
     Move                         ttMove;
     ExtMove *                    cur, *endCur, *endBadCaptures, *endCaptures, *endGenerated;
     int                          stage;
-    Stages                       first_stage;
+    int                          first_stage;
     int                          threshold;
     Depth                        depth;
     int                          ply;
