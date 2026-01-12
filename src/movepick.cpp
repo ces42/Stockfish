@@ -30,21 +30,6 @@ namespace Stockfish {
 
 namespace {
 
-enum Stages {
-    TT = 0,
-    CAPTURE_INIT = 1,
-    GOOD_CAPTURE = 2,
-    GOOD_QUIET,
-    BAD_CAPTURE,
-    BAD_QUIET,
-
-    // generate evasion moves
-    EVASION_INIT,
-
-    JUST_YIELD,
-    YIELD_PROBCUT,
-};
-
 
 // Sort moves in descending order up to and including a given limit.
 // The order of moves smaller than the limit is left unspecified.
@@ -90,12 +75,12 @@ MovePicker::MovePicker(const Position&              p,
 
     if (pos.checkers())
     {
-        type = EVASION;
+        first_stage = EVASION;
         stage = !(ttm && pos.pseudo_legal(ttm));
     }
     else
     {
-        type = depth > 0 ? MAIN_MP : QSEARCH;
+        first_stage = depth > 0 ? GOOD_CAPTURE : QSEARCH;
         stage = !(ttm && pos.pseudo_legal(ttm));
     }
 }
@@ -109,7 +94,7 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
     threshold(th) {
     assert(!pos.checkers());
 
-    type = PROBCUT;
+    first_stage = PROBCUT;
     stage = !(ttm && pos.capture_stage(ttm) && pos.pseudo_legal(ttm));
 }
 
@@ -119,7 +104,7 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
 template<GenType Type>
 ExtMove* MovePicker::score(MoveList<Type>& ml) {
 
-    static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong type");
+    static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong first_stage");
 
     Color us = pos.side_to_move();
 
@@ -203,31 +188,30 @@ Move MovePicker::select(Pred filter) {
 Move MovePicker::next_move() {
 
     constexpr int goodQuietThreshold = -14000;
-top:
+dispatch:
     switch (stage)
     {
 
     case TT :
-        stage = type != EVASION ? CAPTURE_INIT : EVASION_INIT;
+        stage++;
         return ttMove;
 
-    case CAPTURE_INIT :
-    {
-        MoveList<CAPTURES> ml(pos);
+    case FIRST_STAGE_INIT :
+        if (first_stage != EVASION) {
+            MoveList<CAPTURES> ml(pos);
 
-        cur = endBadCaptures = moves;
-        endCur = endCaptures = score<CAPTURES>(ml);
+            cur = endBadCaptures = moves;
+            endCur = endCaptures = score<CAPTURES>(ml);
+        } else {
+            MoveList<EVASIONS> ml(pos);
 
+            cur    = moves;
+            endCur = score<EVASIONS>(ml);
+        }
         partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
 
-        if (type == MAIN_MP)
-            stage = GOOD_CAPTURE;
-        else if (type == QSEARCH)
-            stage = JUST_YIELD;
-        else
-            stage = YIELD_PROBCUT;
-        goto top;
-    }
+        stage = first_stage;
+        goto dispatch;
 
     case GOOD_CAPTURE :
         if (select([&]() {
@@ -278,21 +262,11 @@ top:
 
         return Move::none();
 
-    case EVASION_INIT : {
-        MoveList<EVASIONS> ml(pos);
-
-        cur    = moves;
-        endCur = endGenerated = score<EVASIONS>(ml);
-
-        partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
-        stage = JUST_YIELD;
-        [[fallthrough]];
-    }
-
-    case JUST_YIELD :
+    case QSEARCH :
+    case EVASION :
         return select([]() { return true; });
 
-    case YIELD_PROBCUT :
+    case PROBCUT :
         return select([&]() { return pos.see_ge(*cur, threshold); });
 
     default:

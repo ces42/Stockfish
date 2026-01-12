@@ -27,10 +27,20 @@ namespace Stockfish {
 
 class Position;
 
-enum MPType {
-    MAIN_MP,
-    EVASION,
+enum Stages {
+    TT = 0,
+    FIRST_STAGE_INIT = 1,
+
+    GOOD_CAPTURE,
+    GOOD_QUIET,
+    BAD_CAPTURE,
+    BAD_QUIET,
+
+    // generate evasion moves
+    EVASION_INIT,
+
     QSEARCH,
+    EVASION,
     PROBCUT,
 };
 
@@ -75,10 +85,10 @@ class MovePicker {
     Move                         ttMove;
     ExtMove *                    cur, *endCur, *endBadCaptures, *endCaptures, *endGenerated;
     int                          stage;
+    Stages                       first_stage;
     int                          threshold;
     Depth                        depth;
     int                          ply;
-    MPType                       type;
     bool                         skipQuiets = false;
     ExtMove                      moves[MAX_MOVES];
 };
