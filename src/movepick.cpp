@@ -35,7 +35,6 @@ enum Stages {
     MAIN_TT,
     CAPTURE_INIT,
     GOOD_CAPTURE,
-    QUIET_INIT,
     GOOD_QUIET,
     BAD_CAPTURE,
     BAD_QUIET,
@@ -242,29 +241,24 @@ top:
             return *(cur - 1);
 
         ++stage;
-        [[fallthrough]];
-
-    case QUIET_INIT :
         if (!skipQuiets)
         {
-            MoveList<QUIETS> ml(pos);
-
-            endCur = endGenerated = score<QUIETS>(ml);
+            {
+                MoveList<QUIETS> ml(pos);
+                endCur = endGenerated = score<QUIETS>(ml);
+            }
 
             partial_insertion_sort(cur, endCur, -3560 * depth);
-        }
 
-        ++stage;
-        [[fallthrough]];
+            [[fallthrough]];
 
     case GOOD_QUIET :
-        if (!skipQuiets && select([&]() { return cur->value > goodQuietThreshold; }))
-            return *(cur - 1);
+            return select([&]() { return cur->value > goodQuietThreshold; });
 
+        }
         // Prepare the pointers to loop over the bad captures
         cur    = moves;
         endCur = endBadCaptures;
-
         ++stage;
         [[fallthrough]];
 
@@ -302,12 +296,19 @@ top:
 
     case PROBCUT :
         return select([&]() { return pos.see_ge(*cur, threshold); });
-    }
 
-    assert(false);
-    return Move::none();  // Silence warning
+    default:
+        __builtin_unreachable();
+    }
 }
 
-void MovePicker::skip_quiet_moves() { skipQuiets = true; }
+void MovePicker::skip_quiet_moves() {
+    skipQuiets = true;
+    if (stage == GOOD_QUIET){
+        ++stage;
+        cur = moves;
+        endCur = endBadCaptures;
+    }
+}
 
 }  // namespace Stockfish
