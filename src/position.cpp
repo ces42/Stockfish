@@ -1306,43 +1306,7 @@ void Position::undo_null_move() {
 // Tests if the SEE (Static Exchange Evaluation)
 // value of move is greater or equal to the given threshold. We'll use an
 // algorithm similar to alpha-beta pruning with a null window.
-bool Position::see_ge(Move m, int threshold) const {
-
-    assert(m.is_ok());
-
-    // Only deal with normal moves, assume others pass a simple SEE
-    if (m.type_of() != NORMAL)
-        return VALUE_ZERO >= threshold;
-
-    Square from = m.from_sq(), to = m.to_sq();
-
-    assert(piece_on(from) != NO_PIECE);
-    Piece victim = piece_on(to);
-
-    int swap = PieceValue[victim] - threshold;
-    if (swap < 0)
-        return false;
-    // if (victim != NO_PIECE)
-    //     assert(
-    //         st->defenderCount[to] == (popcount(attackers_to(to) & pieces(color_of(victim))))
-    //     );
-    if (st->defenderCount[to] == 0 && victim != NO_PIECE)
-        return true;
-
-
-    // dbg_hit_on(st->defenderCount[to] == 0);
-    // dbg_hit_on(st->defenderCount[to] == 0 && victim != NO_PIECE, 1);
-
-    // else if (st->defenderCount[to] == 0 && piece_on(to) != NO_PIECE)
-    //     return true;
-
-    // if we are here and threshold > 0 then there is a piece on to
-
-    swap = PieceValue[piece_on(from)] - swap;
-
-    // if PieceValue[piece_on(to)] - PieceValue[piece_on(from)] >= threshold
-    if (swap <= 0)
-        return true;
+bool Position::detailed_see_ge(Square from, Square to, int swap) const {
 
     assert(color_of(piece_on(from)) == sideToMove);
     Bitboard occupied  = pieces() ^ from ^ to;  // xoring to is important for pinned piece logic
