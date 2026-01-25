@@ -51,6 +51,7 @@ struct StateInfo {
     int    rule50;
     int    pliesFromNull;
     Square epSquare;
+    uint8_t defenderCount[SQUARE_NB];
 
     // Not copied when making a move (will be recomputed anyhow)
     Key        key;
@@ -187,6 +188,9 @@ class Position {
     void set_check_info() const;
 
     // Other helpers
+    template<bool PutPiece>
+    void add_dirty_threat(DirtyThreats* const dts, Piece pc, Piece threatened, Square s, Square threatenedSq) const;
+
     template<bool PutPiece, bool ComputeRay = true>
     void update_piece_threats(Piece               pc,
                               Square              s,

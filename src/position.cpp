@@ -370,6 +370,7 @@ void Position::set_state() const {
                     st->minorPieceKey ^= Zobrist::psq[pc][s];
             }
         }
+        st->defenderCount[s] = popcount(attackers_to(s) & pieces(color_of(pc)));
     }
 
     if (st->epSquare != SQ_NONE)
@@ -991,6 +992,13 @@ void Position::do_move(Move                      m,
     assert(!(bool(captured) || m.type_of() == CASTLING) ^ (dp.remove_sq != SQ_NONE));
     assert(dp.from != SQ_NONE);
     assert(!(dp.add_sq != SQ_NONE) ^ (m.type_of() == PROMOTION || m.type_of() == CASTLING));
+
+    for (Bitboard b = pieces(); b;)
+    {
+        Square s  = pop_lsb(b);
+        Piece pc = piece_on(s);
+        assert(st->defenderCount[s] == popcount(attackers_to(s) & pieces(color_of(pc))));
+    }
 }
 
 
@@ -1057,8 +1065,14 @@ void Position::undo_move(Move m) {
 }
 
 template<bool PutPiece>
-inline void add_dirty_threat(
-  DirtyThreats* const dts, Piece pc, Piece threatened, Square s, Square threatenedSq) {
+inline void Position::add_dirty_threat(
+  DirtyThreats* const dts, Piece pc, Piece threatened, Square s, Square threatenedSq) const {
+    if (color_of(pc) == color_of(threatened)) 
+        assert(PutPiece || st->defenderCount[threatenedSq]);
+
+    st->defenderCount[threatenedSq] += (PutPiece ? 1 : -1) * (color_of(pc) == color_of(threatened));
+
+
     if (PutPiece)
     {
         dts->threatenedSqs |= square_bb(threatenedSq);
@@ -1303,12 +1317,30 @@ bool Position::see_ge(Move m, int threshold) const {
     Square from = m.from_sq(), to = m.to_sq();
 
     assert(piece_on(from) != NO_PIECE);
+    Piece victim = piece_on(to);
 
-    int swap = PieceValue[piece_on(to)] - threshold;
+    int swap = PieceValue[victim] - threshold;
     if (swap < 0)
         return false;
+    // if (victim != NO_PIECE)
+    //     assert(
+    //         st->defenderCount[to] == (popcount(attackers_to(to) & pieces(color_of(victim))))
+    //     );
+    if (st->defenderCount[to] == 0 && victim != NO_PIECE)
+        return true;
+
+
+    // dbg_hit_on(st->defenderCount[to] == 0);
+    // dbg_hit_on(st->defenderCount[to] == 0 && victim != NO_PIECE, 1);
+
+    // else if (st->defenderCount[to] == 0 && piece_on(to) != NO_PIECE)
+    //     return true;
+
+    // if we are here and threshold > 0 then there is a piece on to
 
     swap = PieceValue[piece_on(from)] - swap;
+
+    // if PieceValue[piece_on(to)] - PieceValue[piece_on(from)] >= threshold
     if (swap <= 0)
         return true;
 
