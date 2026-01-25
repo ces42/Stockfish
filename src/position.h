@@ -219,6 +219,7 @@ class Position {
     void remove_piece(Square s, DirtyThreats* const dts = nullptr);
     void swap_piece(Square s, Piece pc, DirtyThreats* const dts = nullptr);
 
+    StateInfo*   st;
    private:
 
     bool detailed_see_ge(Square from, Square to, int swap) const;
@@ -257,7 +258,6 @@ class Position {
     int          castlingRightsMask[SQUARE_NB];
     Square       castlingRookSquare[CASTLING_RIGHT_NB];
     Bitboard     castlingPath[CASTLING_RIGHT_NB];
-    StateInfo*   st;
     int          gamePly;
     Color        sideToMove;
     bool         chess960;
