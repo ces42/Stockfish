@@ -28,6 +28,7 @@
 #include <string>
 
 #include "bitboard.h"
+#include "misc.h"
 #include "types.h"
 
 namespace Stockfish {
@@ -147,7 +148,27 @@ class Position {
     void undo_null_move();
 
     // Static Exchange Evaluation
-    bool see_ge(Move m, int threshold = 0) const;
+    sf_always_inline inline bool see_ge(Move m, int threshold = 0) const {
+        assert(m.is_ok());
+
+        // Only deal with normal moves, assume others pass a simple SEE
+        if (m.type_of() != NORMAL)
+            return VALUE_ZERO >= threshold;
+
+        Square from = m.from_sq(), to = m.to_sq();
+
+        assert(piece_on(from) != NO_PIECE);
+
+        int swap = PieceValue[piece_on(to)] - threshold;
+        if (swap < 0)
+            return false;
+
+        swap = PieceValue[piece_on(from)] - swap;
+        if (swap <= 0)
+            return true;
+
+        return detailed_see_ge(from, to, swap);
+    };
 
     // Accessing hash keys
     Key key() const;
@@ -180,6 +201,8 @@ class Position {
     void swap_piece(Square s, Piece pc, DirtyThreats* const dts = nullptr);
 
    private:
+
+    bool detailed_see_ge(Square from, Square to, int swap) const;
     // Initialization helpers (used while setting up a position)
     void set_castling_right(Color c, Square rfrom);
     Key  compute_material_key() const;
