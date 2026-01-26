@@ -149,45 +149,7 @@ class Position {
     void undo_null_move();
 
     // Static Exchange Evaluation
-    sf_always_inline inline bool see_ge(Move m, int threshold = 0) const {
-        assert(m.is_ok());
-
-        // Only deal with normal moves, assume others pass a simple SEE
-        if (m.type_of() != NORMAL)
-            return VALUE_ZERO >= threshold;
-
-        Square from = m.from_sq(), to = m.to_sq();
-
-        assert(piece_on(from) != NO_PIECE);
-        Piece victim = piece_on(to);
-
-        int swap = PieceValue[victim] - threshold;
-        if (swap < 0)
-            return false;
-        // if (victim != NO_PIECE)
-        //     assert(
-        //         st->defenderCount[to] == (popcount(attackers_to(to) & pieces(color_of(victim))))
-        //     );
-        if (st->defenderCount[to] == 0 && victim != NO_PIECE)
-            return true;
-
-
-        // dbg_hit_on(st->defenderCount[to] == 0);
-        // dbg_hit_on(st->defenderCount[to] == 0 && victim != NO_PIECE, 1);
-
-        // else if (st->defenderCount[to] == 0 && piece_on(to) != NO_PIECE)
-        //     return true;
-
-        // if we are here and threshold > 0 then there is a piece on to
-
-        swap = PieceValue[piece_on(from)] - swap;
-
-        // if PieceValue[piece_on(to)] - PieceValue[piece_on(from)] >= threshold
-        if (swap <= 0)
-            return true;
-
-        return detailed_see_ge(from, to, swap);
-    };
+    bool see_ge(Move m, int threshold = 0) const;
 
     // Accessing hash keys
     Key key() const;
@@ -221,8 +183,6 @@ class Position {
 
     StateInfo*   st;
    private:
-
-    bool detailed_see_ge(Square from, Square to, int swap) const;
     // Initialization helpers (used while setting up a position)
     void set_castling_right(Color c, Square rfrom);
     Key  compute_material_key() const;
