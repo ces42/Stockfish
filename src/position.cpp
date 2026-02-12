@@ -1072,7 +1072,7 @@ void write_multiple_dirties(const Position& p,
 
     const __m512i dirties =
       _mm512_ternarylogic_epi32(template_v, threat_squares, threat_pieces, 254 /* A | B | C */);
-    _mm512_storeu_si512(reinterpret_cast<__m512i*>(write), dirties);
+    _mm512_storeu_si512(write, dirties);
 }
 #endif
 
@@ -1092,7 +1092,8 @@ void Position::update_piece_threats(Piece                     pc,
     const Bitboard rAttacks = attacks_bb<ROOK>(s, occupied);
     const Bitboard bAttacks = attacks_bb<BISHOP>(s, occupied);
 
-    Bitboard threatened = attacks_bb(pc, s, occupied) & occupied;
+    Bitboard occupiedNoK = occupied ^ kings;
+    Bitboard threatened = attacks_bb(pc, s, occupied) & occupiedNoK;
     Bitboard sliders    = (rookQueens & rAttacks) | (bishopQueens & bAttacks);
     Bitboard incoming_threats =
       (PseudoAttacks[KNIGHT][s] & knights) | (attacks_bb<PAWN>(s, WHITE) & blackPawns)
@@ -1141,7 +1142,7 @@ void Position::update_piece_threats(Piece                     pc,
             Piece  slider   = piece_on(sliderSq);
 
             const Bitboard ray        = RayPassBB[sliderSq][s] & ~BetweenBB[sliderSq][s];
-            const Bitboard discovered = ray & (rAttacks | bAttacks) & occupied;
+            const Bitboard discovered = ray & (rAttacks | bAttacks) & occupiedNoK;
 
             assert(!more_than_one(discovered));
             if (discovered && (RayPassBB[sliderSq][s] & noRaysContaining) != noRaysContaining)
