@@ -137,7 +137,7 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
         threatByLesser[ROOK] =
           pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[KNIGHT];
         threatByLesser[QUEEN] = pos.attacks_by<ROOK>(~us) | threatByLesser[ROOK];
-        threatByLesser[KING]  = 0;
+        threatByLesser[KING]  = pos.attacks_by<QUEEN>(~us) | threatByLesser[QUEEN];
 
         knightOff = 0;
         Bitboard bb = pos.pieces(~us, BISHOP) | pos.pieces(~us, ROOK) | pos.pieces(~us, QUEEN);
