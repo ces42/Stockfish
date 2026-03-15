@@ -256,6 +256,7 @@ void Search::Worker::start_searching() {
 // repeatedly with increasing depth until the allocated thinking time has been
 // consumed, the user stops the search, or the maximum search depth is reached.
 void Search::Worker::iterative_deepening() {
+    Move printed = Move::none();
 
     SearchManager* mainThread = (is_mainthread() ? main_manager() : nullptr);
 
@@ -266,6 +267,7 @@ void Search::Worker::iterative_deepening() {
     auto  lastBestPV        = std::vector{Move::none()};
 
     Value  alpha, beta;
+    Depth adjustedDepth;
     Value  bestValue     = -VALUE_INFINITE;
     Color  us            = rootPos.side_to_move();
     double timeReduction = 1, totBestMoveChanges = 0;
@@ -365,9 +367,10 @@ void Search::Worker::iterative_deepening() {
             int failedHighCnt = 0;
             while (true)
             {
+                secondBestScore = bestScore = -VALUE_INFINITE;
                 // Adjust the effective depth searched, but ensure at least one
                 // effective increment for every four searchAgain steps (see issue #2717).
-                Depth adjustedDepth =
+                adjustedDepth =
                   std::max(1, rootDepth - failedHighCnt - 3 * (searchAgainCounter + 1) / 4);
                 rootDelta = beta - alpha;
                 bestValue = search<Root>(rootPos, ss, alpha, beta, adjustedDepth, false);
@@ -474,11 +477,30 @@ void Search::Worker::iterative_deepening() {
         if (skill.enabled() && skill.time_to_pick(rootDepth))
             skill.pick_best(rootMoves, multiPV);
 
-        // Use part of the gained time from a previous stable move for the current move
+        // Use part of the g(ss->excludedMove |ained time from a previous stable move for the current move
         for (auto&& th : threads)
         {
             totBestMoveChanges += th->worker->bestMoveChanges;
             th->worker->bestMoveChanges = 0;
+        }
+
+        if (rootDepth > 5 && rootMoves.size() > 1) {
+            constexpr Value red = PawnValue * 3/4;
+            Move bestMove = rootMoves[0].pv[0];
+
+            ss->excludedMove = bestMove;
+            Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
+            bool singular = secondBest < bestValue - red;
+            ss->excludedMove = Move::none();
+
+            // if (!dbg_hit_on(singular, 2) && printed != bestMove) {
+            //     std::cout << std::endl;
+            //     std::cout << rootPos.fen() << std::endl;
+            //     std::cout << UCIEngine::move(bestMove, false) << std::endl;
+            //     // std::cout << bestMove.raw() << std::endl;
+            //     std::cout << bestValue * 1.0 / PawnValue << " >> " << secondBest * 1.0 / PawnValue << std::endl;
+            //     printed = bestMove;
+            // }
         }
 
         // Do we have time for the next iteration? Can we stop searching now?
@@ -1315,9 +1337,11 @@ moves_loop:  // When in check, search starts here
                                   : value * std::abs(value);
 
             // PV move or new best move?
-            if (moveCount == 1 || value > alpha)
+            if ((moveCount == 1 || value > alpha) && !ss->excludedMove)
             {
-                rm.score = rm.uciScore = value;
+                // assert(value >= bestScore);
+                // secondBestScore = bestScore;
+                bestScore = rm.score = rm.uciScore = value;
                 rm.selDepth            = selDepth;
                 rm.scoreLowerbound = rm.scoreUpperbound = false;
 
