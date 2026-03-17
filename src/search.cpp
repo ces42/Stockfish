@@ -262,7 +262,7 @@ void Search::Worker::iterative_deepening() {
 
     Move pv[MAX_PLY + 1];
 
-    Depth lastBestMoveDepth = 0;
+    Depth lastBMChange = 0;
     Value lastBestScore     = -VALUE_INFINITE;
     auto  lastBestPV        = std::vector{Move::none()};
 
@@ -271,6 +271,7 @@ void Search::Worker::iterative_deepening() {
     Value  bestValue     = -VALUE_INFINITE;
     Color  us            = rootPos.side_to_move();
     double timeReduction = 1, totBestMoveChanges = 0;
+    int lastBMChangeDepth = 0;
     int    delta, iterIdx                        = 0;
 
     // Allocate stack with extra size to allow access from (ss - 7) to (ss + 2):
@@ -458,7 +459,7 @@ void Search::Worker::iterative_deepening() {
         {
             lastBestPV        = rootMoves[0].pv;
             lastBestScore     = rootMoves[0].score;
-            lastBestMoveDepth = rootDepth;
+            lastBMChange = rootDepth;
         }
 
         if (!mainThread)
@@ -481,17 +482,59 @@ void Search::Worker::iterative_deepening() {
         for (auto&& th : threads)
         {
             totBestMoveChanges += th->worker->bestMoveChanges;
+            lastBMChange = std::max(lastBMChange, th->worker->bmChangeDepth.load());
             th->worker->bestMoveChanges = 0;
+            th->worker->bmChangeDepth = 0;
         }
 
-        if (rootDepth > 5 && rootMoves.size() > 1) {
-            constexpr Value red = PawnValue * 3/4;
-            Move bestMove = rootMoves[0].pv[0];
+        constexpr Value red = PawnValue * 1/2;
+        Move bestMove = rootMoves[0].pv[0];
+        // let's find a cheap heuristic for singular moves?
+        auto heuristic1 = [&]() {
+            return rootDepth > 6 && rootMoves.size() > 1
+            && (bestValue > Eval::simple_eval(rootPos) + PawnValue * 1/2)
+            && rootPos.count<ALL_PIECES>() > 8
+            && rootPos.capture(bestMove)
+            && lastBMChange < 4
+            && std::all_of(rootMoves.begin(), rootMoves.end(),
+                           [&](RootMove& m) {
+                           return m == bestMove || m.pv[0].to_sq() != bestMove.to_sq();});
+        };
 
-            ss->excludedMove = bestMove;
-            Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
-            bool singular = secondBest < bestValue - red;
-            ss->excludedMove = Move::none();
+        if (rootDepth > 6 && rootMoves.size() > 1) {
+
+            // bool heuristic2 = rootPos.count<ALL_PIECES>() > 8
+            //     // && rootPos.capture(bestMove)
+            //     && (bestValue > Eval::simple_eval(rootPos) + PawnValue * 1/2)
+            //     && lastBMChange < 4
+            //     && std::all_of(rootMoves.begin(), rootMoves.end(),
+            //                    [&](RootMove& m) {
+            //                    return m == bestMove || m.pv[0].to_sq() != bestMove.to_sq();});
+
+            // bool heuristic2 = rootPos.count<ALL_PIECES>() > 8
+            //     && lastBestMoveDepth < 4
+            //     && rootPos.capture(bestMove)
+            //     && rootPos.see_ge(bestMove, PawnValue * 4/5)
+            //     && std::all_of(rootMoves.begin(), rootMoves.end(),
+            //                    [&](RootMove& m) {
+            //                    return m == bestMove || !rootPos.see_ge(m.pv[0], PawnValue * 4/5);});
+
+
+            // if (dbg_hit_on(heuristic1())) {
+            //     ss->excludedMove = bestMove;
+            //     Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
+            //     bool singular = secondBest < bestValue - red;
+            //     dbg_hit_on(singular, 1);
+            //     ss->excludedMove = Move::none();
+            // }
+
+            // if (dbg_hit_on(heuristic2, 5)) {
+            //     ss->excludedMove = bestMove;
+            //     Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
+            //     bool singular = secondBest < bestValue - red;
+            //     dbg_hit_on(singular, 6);
+            //     ss->excludedMove = Move::none();
+            // }
 
             // if (!dbg_hit_on(singular, 2) && printed != bestMove) {
             //     std::cout << std::endl;
@@ -516,7 +559,7 @@ void Search::Worker::iterative_deepening() {
 
             // If the bestMove is stable over several iterations, reduce time accordingly
             double k      = 0.51;
-            double center = lastBestMoveDepth + 12.15;
+            double center = lastBMChange + 12.15;
 
             timeReduction = 0.66 + 0.85 / (0.98 + std::exp(-k * (completedDepth - center)));
 
@@ -534,6 +577,19 @@ void Search::Worker::iterative_deepening() {
                 totalTime = std::min(502.0, totalTime);
 
             auto elapsedTime = elapsed();
+
+            if (heuristic1() && elapsedTime > totalTime / 3) {
+                ss->excludedMove = bestMove;
+                Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
+                if (secondBest < bestValue - red) {
+                    if (mainThread->ponder)
+                        mainThread->stopOnPonderhit = true;
+                    else
+                        threads.stop = true;
+                }
+                // dbg_hit_on(singular, 1);
+                ss->excludedMove = Move::none();
+            }
 
             // Stop the search if we have exceeded the totalTime or maximum
             if (elapsedTime > std::min(totalTime, double(mainThread->tm.maximum())))
@@ -1367,7 +1423,10 @@ moves_loop:  // When in check, search starts here
                 // This information is used for time management. In MultiPV mode,
                 // we must take care to only do this for the first PV line.
                 if (moveCount > 1 && !pvIdx)
+                {
                     ++bestMoveChanges;
+                    bmChangeDepth.store(std::max(bmChangeDepth.load(), depth));
+                }
             }
             else
                 // All other moves but the PV, are set to the lowest value: this
