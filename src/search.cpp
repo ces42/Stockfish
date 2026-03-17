@@ -367,7 +367,6 @@ void Search::Worker::iterative_deepening() {
             int failedHighCnt = 0;
             while (true)
             {
-                secondBestScore = bestScore = -VALUE_INFINITE;
                 // Adjust the effective depth searched, but ensure at least one
                 // effective increment for every four searchAgain steps (see issue #2717).
                 adjustedDepth =
@@ -477,7 +476,7 @@ void Search::Worker::iterative_deepening() {
         if (skill.enabled() && skill.time_to_pick(rootDepth))
             skill.pick_best(rootMoves, multiPV);
 
-        // Use part of the g(ss->excludedMove |ained time from a previous stable move for the current move
+        // Use part of the gained time from a previous stable move for the current move
         for (auto&& th : threads)
         {
             totBestMoveChanges += th->worker->bestMoveChanges;
@@ -1363,9 +1362,7 @@ moves_loop:  // When in check, search starts here
             // PV move or new best move?
             if ((moveCount == 1 || value > alpha) && !ss->excludedMove)
             {
-                // assert(value >= bestScore);
-                // secondBestScore = bestScore;
-                bestScore = rm.score = rm.uciScore = value;
+                rm.score = rm.uciScore = value;
                 rm.selDepth            = selDepth;
                 rm.scoreLowerbound = rm.scoreUpperbound = false;
 
