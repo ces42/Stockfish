@@ -332,7 +332,6 @@ class Worker {
 
     size_t                pvIdx, pvLast;
     std::atomic<uint64_t> nodes, tbHits, bestMoveChanges;
-    std::atomic<int> bmChangeDepth;
     Value bestScore, secondBestScore;
     int                   selDepth, nmpMinPly;
 
