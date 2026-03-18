@@ -509,47 +509,6 @@ void Search::Worker::iterative_deepening() {
                 && !rootPos.checkers();
         };
 
-        if (!limits.use_time_management() && rootDepth > 6) {
-            if (rootDepth > 6
-                && !notSingular
-                && dbg_hit_on(heuristic2(), 2)
-            ) {
-                Value red = blunderValue;
-                ss->excludedMove = bestMove;
-                Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
-
-                if (dbg_hit_on(secondBest < bestValue - red, 3))
-                    ;
-                else {
-                    notSingular = true;
-                }
-                ss->excludedMove = Move::none();
-
-            } else if (rootDepth > 6
-                && !notSingular
-                && dbg_hit_on(heuristic1())
-            ) {
-                // dbg_hit_on(bestValue - Eval::simple_eval(rootPos) < PawnValue/2, 2);
-                // dbg_hit_on(bestValue - ss->staticEval < PawnValue/2, 4);
-                // dbg_hit_on(bestValue - ss->staticEval < 0, 5);
-                // reduction will range from 0.43 * blunderValue to blunderValue
-                Value red = blunderValue;
-                ss->excludedMove = bestMove;
-                Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
-                if (dbg_hit_on(secondBest < bestValue - red, 1)) {
-                    ;
-                } else {
-                    // hypothesis 1 did not predict correctly... post-mortem analysis
-
-                    // dbg_hit_on(bestValue - ss->staticEval < PawnValue/2, 7);
-                    // dbg_hit_on(bestValue - ss->staticEval < 0, 8);
-                    std::cout << "problem position depth " << adjustedDepth << ": " << rootPos.fen() << std::endl;
-                    notSingular = true;
-                }
-                ss->excludedMove = Move::none();
-            }
-        }
-
 
         // Do we have time for the next iteration? Can we stop searching now?
         if (limits.use_time_management() && !threads.stop && !mainThread->stopOnPonderhit)
@@ -590,13 +549,12 @@ void Search::Worker::iterative_deepening() {
                 && elapsedTime > minTime
                 && elapsedTime < maxTime
                 && !notSingular
-                && dbg_hit_on(heuristic2(), 2)
+                && (heuristic2() || heuristic1())
             ) {
                 Value red = int(blunderValue * (1.33 - elapsedTime/totalTime));
                 ss->excludedMove = bestMove;
                 Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
 
-                dbg_mean_of(100 * elapsed() / elapsedTime - 100);
                 if (dbg_hit_on(secondBest < bestValue - red, 3))
                     totalTime *= 0.33; // will cause us to move now
                 else {
@@ -604,30 +562,6 @@ void Search::Worker::iterative_deepening() {
                 }
                 ss->excludedMove = Move::none();
 
-            } else if (rootDepth > 6
-                && elapsedTime > minTime
-                && elapsedTime < maxTime
-                && !notSingular
-                && dbg_hit_on(heuristic1())
-            ) {
-                // dbg_hit_on(bestValue - Eval::simple_eval(rootPos) < PawnValue/2, 2);
-                dbg_hit_on(bestValue - ss->staticEval < PawnValue/2, 4);
-                dbg_hit_on(bestValue - ss->staticEval < 0, 5);
-                // reduction will range from 0.43 * blunderValue to blunderValue
-                Value red = int(blunderValue * (1.33 - elapsedTime/totalTime));
-                ss->excludedMove = bestMove;
-                Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
-                dbg_mean_of(100 * elapsed() / elapsedTime - 100);
-                if (dbg_hit_on(secondBest < bestValue - red, 1)) {
-                    totalTime *= 0.33; // will cause us to move now
-                } else {
-                    // hypothesis 1 did not predict correctly... post-mortem analysis
-                    dbg_hit_on(bestValue - ss->staticEval < PawnValue/2, 7);
-                    dbg_hit_on(bestValue - ss->staticEval < 0, 8);
-                    std::cout << "problem position: " << rootPos.fen() << std::endl;
-                    notSingular = true;
-                }
-                ss->excludedMove = Move::none();
             }
 
             // Stop the search if we have exceeded the totalTime or maximum
