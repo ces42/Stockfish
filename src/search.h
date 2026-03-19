@@ -96,6 +96,7 @@ struct RootMove {
 
     uint64_t          effort           = 0;
     Value             score            = -VALUE_INFINITE;
+    Value             staticEval       = -VALUE_INFINITE;
     Value             previousScore    = -VALUE_INFINITE;
     Value             averageScore     = -VALUE_INFINITE;
     Value             meanSquaredScore = -VALUE_INFINITE * VALUE_INFINITE;

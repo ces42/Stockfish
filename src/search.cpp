@@ -521,7 +521,7 @@ void Search::Worker::iterative_deepening() {
                 // && (bestValue > Eval::simple_eval(rootPos) + PawnValue/4)
                 // && rootPos.capture(bestMove)
                 && lastBestMoveDepth < 4
-                && (bestValue > ss->staticEval + PawnValue)
+                && (-rootMoves[0].staticEval > ss->staticEval + PawnValue)
                 && !rootPos.checkers();
         };
 
@@ -565,7 +565,7 @@ void Search::Worker::iterative_deepening() {
                 && elapsedTime > minTime
                 && elapsedTime < maxTime
                 && !notSingular
-                && (heuristic2() || heuristic1())
+                && (dbg_hit_on(heuristic2(), 2) || dbg_hit_on(heuristic1()))
             ) {
                 Value red = int(blunderValue * (1.33 - elapsedTime/totalTime));
                 ss->excludedMove = bestMove;
@@ -1395,6 +1395,7 @@ moves_loop:  // When in check, search starts here
             if ((moveCount == 1 || value > alpha) && !ss->excludedMove)
             {
                 rm.score = rm.uciScore = value;
+                rm.staticEval = (ss + 1)->staticEval;
                 rm.selDepth            = selDepth;
                 rm.scoreLowerbound = rm.scoreUpperbound = false;
 
