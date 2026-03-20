@@ -545,7 +545,7 @@ void Search::Worker::iterative_deepening() {
                 ss->excludedMove = bestMove;
                 Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
 
-                if (dbg_hit_on(secondBest < bestValue - red, 3))
+                if (false)
                     totalTime *= 0.33; // will cause us to move now
                 else {
                     notSingular = true;
