@@ -257,6 +257,7 @@ void Search::Worker::start_searching() {
 // repeatedly with increasing depth until the allocated thinking time has been
 // consumed, the user stops the search, or the maximum search depth is reached.
 void Search::Worker::iterative_deepening() {
+    bool notSingular = false;
 
     SearchManager* mainThread = (is_mainthread() ? main_manager() : nullptr);
 
@@ -267,6 +268,7 @@ void Search::Worker::iterative_deepening() {
     std::vector<Move> lastBestPV;
 
     Value  alpha, beta;
+    Depth adjustedDepth;
     Value  bestValue     = -VALUE_INFINITE;
     Color  us            = rootPos.side_to_move();
     double timeReduction = 1, totBestMoveChanges = 0;
@@ -368,7 +370,7 @@ void Search::Worker::iterative_deepening() {
             {
                 // Adjust the effective depth searched, but ensure at least one
                 // effective increment for every four searchAgain steps (see issue #2717).
-                Depth adjustedDepth =
+                adjustedDepth =
                   std::max(1, rootDepth - failedHighCnt - 3 * (searchAgainCounter + 1) / 4);
                 rootDelta = beta - alpha;
                 bestValue = search<Root>(rootPos, ss, alpha, beta, adjustedDepth, false);
@@ -497,6 +499,8 @@ void Search::Worker::iterative_deepening() {
             th->worker->bestMoveChanges = 0;
         }
 
+        constexpr Value blunderValue = PawnValue * 1/2;
+        Move bestMove = rootMoves[0].pv[0];
         // Do we have time for the next iteration? Can we stop searching now?
         if (limits.use_time_management() && !threads.stop && !mainThread->stopOnPonderhit)
         {
@@ -529,6 +533,26 @@ void Search::Worker::iterative_deepening() {
 
             auto elapsedTime = elapsed();
 
+            auto minTime = totalTime * 0.33;
+            auto maxTime = totalTime * 0.9;
+
+            if (rootDepth > 6
+                && elapsedTime > minTime
+                && elapsedTime < maxTime
+                && !notSingular
+            ) {
+                Value red = int(blunderValue * (1.33 - elapsedTime/totalTime));
+                ss->excludedMove = bestMove;
+                Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
+
+                if (dbg_hit_on(secondBest < bestValue - red, 3))
+                    totalTime *= 0.33; // will cause us to move now
+                else {
+                    notSingular = true;
+                }
+                ss->excludedMove = Move::none();
+
+            }
             // Stop the search if we have exceeded the totalTime or maximum
             if (elapsedTime > std::min(totalTime, double(mainThread->tm.maximum())))
             {

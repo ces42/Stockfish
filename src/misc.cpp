@@ -319,11 +319,12 @@ std::array<DebugExtremes, MaxDebugSlots> extremes;
 
 }  // namespace
 
-void dbg_hit_on(bool cond, int slot) {
+bool dbg_hit_on(bool cond, int slot) {
 
     ++hit.at(slot)[0];
     if (cond)
         ++hit.at(slot)[1];
+    return cond;
 }
 
 void dbg_mean_of(int64_t value, int slot) {
