@@ -253,23 +253,11 @@ void Search::Worker::start_searching() {
     main_manager()->updates.onBestmove(bestmove, ponder);
 }
 
-Value blunderValue = PawnValue * 3/4;
-Value h2EvalDiff = PawnValue;
-int minTimeFrac = 330;
-int minRemainingTime = 100;
-int baseRed = 330;
-int failTimeRefund = 50;
-TUNE(blunderValue, h2EvalDiff);
-TUNE(minTimeFrac);
-TUNE(SetRange(40, 250), minRemainingTime);
-TUNE(baseRed);
-TUNE(SetRange(5, 100), failTimeRefund);
-
-
-int bmcBase = 1088;
-int bmcSlope = 2315;
-TUNE(bmcBase, bmcSlope);
-
+// PawnValue = 208
+Value blunderValue = 158; // ~ 0.76 pawns
+Value h2EvalDiff = 217; // ~1.08 pawns
+double minTimeFrac = 0.314;
+double minRemainingTime = 0.103;
 
 // Main iterative deepening loop. It calls search()
 // repeatedly with increasing depth until the allocated thinking time has been
@@ -562,13 +550,13 @@ void Search::Worker::iterative_deepening() {
 
             double reduction = (1.5 + mainThread->previousTimeReduction) / (2.255 * timeReduction);
 
-            double bestMoveInstability = bmcBase/1000.0 + bmcSlope/1000.0 * totBestMoveChanges / threads.size();
+            double bestMoveInstability = 1 + 2.153 * totBestMoveChanges / threads.size();
 
             double highBestMoveEffort = nodesEffort > 86000 ? 0.74 : 0.96;
 
             double totalTime = mainThread->tm.optimum() * fallingEval * reduction
                              * bestMoveInstability * highBestMoveEffort
-                             * (1 + failTimeRefund / 1000.0 * notSingular);
+                             * (1 + 0.05 * notSingular);
 
             // Cap used time in case of a single legal move for a better viewer experience
             if (rootMoves.size() == 1)
@@ -576,8 +564,8 @@ void Search::Worker::iterative_deepening() {
 
             auto elapsedTime = elapsed();
 
-            auto minTime = totalTime * minTimeFrac / 1000.0;
-            auto maxTime = totalTime * (1 - minRemainingTime / 1000.0);
+            auto minTime = totalTime * minTimeFrac;
+            auto maxTime = totalTime * (1 - minRemainingTime);
 
             if (rootDepth > 6
                 && elapsedTime > minTime
@@ -585,12 +573,12 @@ void Search::Worker::iterative_deepening() {
                 && !notSingular
                 && (dbg_hit_on(heuristic2(), 2) || dbg_hit_on(heuristic1()))
             ) {
-                Value red = int(blunderValue * (baseRed/1000.0 + 1 - (1.0 * elapsedTime)/totalTime));
+                Value red = int(blunderValue * (1.34 - (1.0 * elapsedTime)/totalTime));
                 ss->excludedMove = bestMove;
                 Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
 
                 if (dbg_hit_on(secondBest < bestValue - red, 3))
-                    totalTime *= minTimeFrac / 1000.0; // will cause us to move now
+                    totalTime *= minTimeFrac; // will cause us to move now
                 else {
                     notSingular = true;
                 }
