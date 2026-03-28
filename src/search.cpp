@@ -255,7 +255,7 @@ void Search::Worker::start_searching() {
 
 // PawnValue = 208
 Value blunderValue = 158; // ~ 0.76 pawns
-Value h2EvalDiff = 217; // ~1.08 pawns
+Value h2EvalDiff = 110;
 double minTimeFrac = 0.314;
 double minRemainingTime = 0.103;
 
@@ -274,7 +274,7 @@ void Search::Worker::iterative_deepening() {
     std::vector<Move> lastBestPV;
 
     Value  alpha, beta;
-    Depth adjustedDepth;
+    Depth adjustedDepth = 1;
     Value  bestValue     = -VALUE_INFINITE;
     Color  us            = rootPos.side_to_move();
     double timeReduction = 1, totBestMoveChanges = 0;
@@ -509,9 +509,9 @@ void Search::Worker::iterative_deepening() {
         // let's find a cheap heuristic for singular moves?
         auto heuristic1 = [&]() {
             return rootMoves.size() > 1
-                // && (bestValue > Eval::simple_eval(rootPos) + PawnValue/4)
+                // && (bestValue > ss->staticEval + PawnValue/4)
                 // && rootPos.capture(bestMove)
-                && lastBestMoveDepth < 4
+                && lastBestMoveDepth == 1
                 && rootPos.see_ge(bestMove, 100)
                 && std::all_of(rootMoves.begin(), rootMoves.end(),
                                [&](RootMove& rm) {
@@ -525,9 +525,14 @@ void Search::Worker::iterative_deepening() {
             return rootMoves.size() > 1
                 // && (bestValue > Eval::simple_eval(rootPos) + PawnValue/4)
                 // && rootPos.capture(bestMove)
-                && lastBestMoveDepth < 4
-                && (-rootMoves[0].staticEval > ss->staticEval + h2EvalDiff)
-                && !rootPos.checkers();
+                && lastBestMoveDepth == 1
+                && !rootPos.checkers()
+                // && (-rootMoves[0].staticEval > ss->staticEval + h2EvalDiff)
+                && std::all_of(rootMoves.begin(), rootMoves.end(),
+                               [&](RootMove& rm) {
+                                   if (rm.pv[0] == bestMove) return true;
+                                   return -rm.staticEval < bestValue - h2EvalDiff;
+                               });
         };
 
 
@@ -567,22 +572,26 @@ void Search::Worker::iterative_deepening() {
             auto minTime = totalTime * minTimeFrac;
             auto maxTime = totalTime * (1 - minRemainingTime);
 
+            bool h2;
             if (rootDepth > 6
                 && elapsedTime > minTime
                 && elapsedTime < maxTime
                 && !notSingular
-                && (dbg_hit_on(heuristic2(), 2) || dbg_hit_on(heuristic1()))
+                && (dbg_hit_on(h2 = heuristic2(), 2) || dbg_hit_on(heuristic1(), 1))
             ) {
                 Value red = int(blunderValue * (1.34 - (1.0 * elapsedTime)/totalTime));
                 ss->excludedMove = bestMove;
                 Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
+                ss->excludedMove = Move::none();
 
-                if (dbg_hit_on(secondBest < bestValue - red, 3))
+                // if (h2)
+                //     dbg_hit_on(rootPos.capture(bestMove), 8);
+
+                if (dbg_hit_on(secondBest < bestValue - red, h2 ? 4 : 3))
                     totalTime *= minTimeFrac; // will cause us to move now
                 else {
                     notSingular = true;
                 }
-                ss->excludedMove = Move::none();
 
             }
 
@@ -1430,10 +1439,13 @@ moves_loop:  // When in check, search starts here
                     ++bestMoveChanges;
             }
             else
+            {
                 // All other moves but the PV, are set to the lowest value: this
                 // is not a problem when sorting because the sort is stable and the
                 // move position in the list is preserved - just the PV is pushed up.
                 rm.score = -VALUE_INFINITE;
+                rm.staticEval = (ss + 1)->staticEval;
+            }
         }
 
         // In case we have an alternative move equal in eval to the current bestmove,
