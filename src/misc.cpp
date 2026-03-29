@@ -321,9 +321,9 @@ std::array<DebugExtremes, MaxDebugSlots> extremes;
 
 bool dbg_hit_on(bool cond, int slot) {
 
-    // ++hit.at(slot)[0];
-    // if (cond)
-    //     ++hit.at(slot)[1];
+    ++hit.at(slot)[0];
+    if (cond)
+        ++hit.at(slot)[1];
     return cond;
 }
 

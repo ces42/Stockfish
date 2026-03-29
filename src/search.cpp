@@ -535,6 +535,16 @@ void Search::Worker::iterative_deepening() {
                                });
         };
 
+        auto heuristic3 = [&]() {
+            if (rootMoves.size() == 1 || lastBestMoveDepth > 1)
+                return false;
+            Value red = blunderValue * 8/10;
+            ss->excludedMove = bestMove;
+            Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, 1, false);
+            ss->excludedMove = Move::none();
+            return secondBest < bestValue - red;
+        };
+
 
         // Do we have time for the next iteration? Can we stop searching now?
         if (limits.use_time_management() && !threads.stop && !mainThread->stopOnPonderhit)
@@ -572,12 +582,13 @@ void Search::Worker::iterative_deepening() {
             auto minTime = totalTime * minTimeFrac;
             auto maxTime = totalTime * (1 - minRemainingTime);
 
-            bool h2;
+            bool h2 = heuristic2();
+            bool h3 = heuristic3();
             if (rootDepth > 6
                 && elapsedTime > minTime
                 && elapsedTime < maxTime
                 && !notSingular
-                && (dbg_hit_on(h2 = heuristic2(), 2) || dbg_hit_on(heuristic1(), 1))
+                && (dbg_hit_on(h3, 3) || dbg_hit_on(h2, 2) || dbg_hit_on(heuristic1(), 1))
             ) {
                 Value red = int(blunderValue * (1.34 - (1.0 * elapsedTime)/totalTime));
                 ss->excludedMove = bestMove;
@@ -587,7 +598,7 @@ void Search::Worker::iterative_deepening() {
                 // if (h2)
                 //     dbg_hit_on(rootPos.capture(bestMove), 8);
 
-                if (dbg_hit_on(secondBest < bestValue - red, h2 ? 4 : 3))
+                if (dbg_hit_on(secondBest < bestValue - red, h3 ? 6 : h2 ? 5 : 4))
                     totalTime *= minTimeFrac; // will cause us to move now
                 else {
                     notSingular = true;
