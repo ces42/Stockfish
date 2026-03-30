@@ -255,7 +255,8 @@ void Search::Worker::start_searching() {
 
 // PawnValue = 208
 Value blunderValue = 158; // ~ 0.76 pawns
-Value h2EvalDiff = 110;
+// Value h2EvalDiff = 110;
+Value h3EvalDiff = 110;
 double minTimeFrac = 0.314;
 double minRemainingTime = 0.103;
 
@@ -507,38 +508,38 @@ void Search::Worker::iterative_deepening() {
 
         Move bestMove = rootMoves[0].pv[0];
         // let's find a cheap heuristic for singular moves?
-        auto heuristic1 = [&]() {
-            return rootMoves.size() > 1
-                // && (bestValue > ss->staticEval + PawnValue/4)
-                // && rootPos.capture(bestMove)
-                && lastBestMoveDepth == 1
-                && rootPos.see_ge(bestMove, 100)
-                && std::all_of(rootMoves.begin(), rootMoves.end(),
-                               [&](RootMove& rm) {
-                                   Move m = rm.pv[0];
-                                   if (m == bestMove) return true;
-                                   return !rootPos.see_ge(m, rootPos.gives_check(m) ? -100 : 100);
-                               });
-        };
-
-        auto heuristic2 = [&]() {
-            return rootMoves.size() > 1
-                // && (bestValue > Eval::simple_eval(rootPos) + PawnValue/4)
-                // && rootPos.capture(bestMove)
-                && lastBestMoveDepth == 1
-                && !rootPos.checkers()
-                // && (-rootMoves[0].staticEval > ss->staticEval + h2EvalDiff)
-                && std::all_of(rootMoves.begin(), rootMoves.end(),
-                               [&](RootMove& rm) {
-                                   if (rm.pv[0] == bestMove) return true;
-                                   return -rm.staticEval < bestValue - h2EvalDiff;
-                               });
-        };
+        // auto heuristic1 = [&]() {
+        //     return rootMoves.size() > 1
+        //         // && (bestValue > ss->staticEval + PawnValue/4)
+        //         // && rootPos.capture(bestMove)
+        //         && lastBestMoveDepth == 1
+        //         && rootPos.see_ge(bestMove, 100)
+        //         && std::all_of(rootMoves.begin(), rootMoves.end(),
+        //                        [&](RootMove& rm) {
+        //                            Move m = rm.pv[0];
+        //                            if (m == bestMove) return true;
+        //                            return !rootPos.see_ge(m, rootPos.gives_check(m) ? -100 : 100);
+        //                        });
+        // };
+        //
+        // auto heuristic2 = [&]() {
+        //     return rootMoves.size() > 1
+        //         // && (bestValue > Eval::simple_eval(rootPos) + PawnValue/4)
+        //         // && rootPos.capture(bestMove)
+        //         && lastBestMoveDepth == 1
+        //         && !rootPos.checkers()
+        //         // && (-rootMoves[0].staticEval > ss->staticEval + h2EvalDiff)
+        //         && std::all_of(rootMoves.begin(), rootMoves.end(),
+        //                        [&](RootMove& rm) {
+        //                            if (rm.pv[0] == bestMove) return true;
+        //                            return -rm.staticEval < bestValue - h2EvalDiff;
+        //                        });
+        // };
 
         auto heuristic3 = [&]() {
             if (rootMoves.size() == 1 || lastBestMoveDepth > 1)
                 return false;
-            Value red = blunderValue * 8/10;
+            Value red = h3EvalDiff;
             ss->excludedMove = bestMove;
             Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, 1, false);
             ss->excludedMove = Move::none();
@@ -582,13 +583,13 @@ void Search::Worker::iterative_deepening() {
             auto minTime = totalTime * minTimeFrac;
             auto maxTime = totalTime * (1 - minRemainingTime);
 
-            bool h2 = heuristic2();
-            bool h3 = heuristic3();
+            // bool h2 = heuristic2();
+            // bool h3 = heuristic3();
             if (rootDepth > 6
                 && elapsedTime > minTime
                 && elapsedTime < maxTime
                 && !notSingular
-                && (dbg_hit_on(h3, 3) || dbg_hit_on(h2, 2) || dbg_hit_on(heuristic1(), 1))
+                && heuristic3()
             ) {
                 Value red = int(blunderValue * (1.34 - (1.0 * elapsedTime)/totalTime));
                 ss->excludedMove = bestMove;
@@ -598,7 +599,7 @@ void Search::Worker::iterative_deepening() {
                 // if (h2)
                 //     dbg_hit_on(rootPos.capture(bestMove), 8);
 
-                if (dbg_hit_on(secondBest < bestValue - red, h3 ? 6 : h2 ? 5 : 4))
+                if (secondBest < bestValue - red)
                     totalTime *= minTimeFrac; // will cause us to move now
                 else {
                     notSingular = true;
