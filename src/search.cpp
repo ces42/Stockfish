@@ -256,7 +256,7 @@ void Search::Worker::start_searching() {
 // PawnValue = 208
 Value blunderValue = 158; // ~ 0.76 pawns
 // Value h2EvalDiff = 110;
-Value h3EvalDiff = 110;
+Value h3EvalDiff = 120;
 double minTimeFrac = 0.314;
 double minRemainingTime = 0.103;
 
@@ -536,14 +536,20 @@ void Search::Worker::iterative_deepening() {
         //                        });
         // };
 
+        auto razor_less = [&](Stack *ss, Value x, Depth d) {
+            return search<Root>(rootPos, ss, x - 1, x, d, false) < x;
+        };
+
         auto heuristic3 = [&]() {
             if (rootMoves.size() == 1 || lastBestMoveDepth > 1)
                 return false;
-            Value red = h3EvalDiff;
+
             ss->excludedMove = bestMove;
-            Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, 1, false);
+            bool ret = razor_less(ss, bestValue - h3EvalDiff/2, 1)
+                && razor_less(ss, bestValue - h3EvalDiff, 2);
+
             ss->excludedMove = Move::none();
-            return secondBest < bestValue - red;
+            return ret;
         };
 
 
@@ -589,22 +595,36 @@ void Search::Worker::iterative_deepening() {
                 && elapsedTime > minTime
                 && elapsedTime < maxTime
                 && !notSingular
-                && heuristic3()
+                && dbg_hit_on(rootMoves[0].pv.size() >= 2, 8)
+                && dbg_hit_on(heuristic3(), 1)
             ) {
                 Value red = int(blunderValue * (1.34 - (1.0 * elapsedTime)/totalTime));
+                StateInfo st;
+                do_move(rootPos, bestMove, st, ss);
+                (ss+1)->excludedMove = rootMoves[0].pv[1];
+                bool oppNonsingular = !razor_less(ss + 1, bestValue - red/2, 1);
+                (ss+1)->excludedMove = Move::none();
+                undo_move(rootPos, bestMove);
+
                 ss->excludedMove = bestMove;
-                Value secondBest = search<Root>(rootPos, ss, bestValue - red - 1, bestValue - red, adjustedDepth, false);
+                bool isSingular = razor_less(ss, bestValue - red, adjustedDepth);
                 ss->excludedMove = Move::none();
 
                 // if (h2)
                 //     dbg_hit_on(rootPos.capture(bestMove), 8);
 
-                if (secondBest < bestValue - red)
+                if (dbg_hit_on(oppNonsingular, 10) && dbg_hit_on(isSingular, 4))
                     totalTime *= minTimeFrac; // will cause us to move now
                 else {
                     notSingular = true;
                 }
+                dbg_mean_of(elapsed() - elapsedTime, 1);
 
+            } else if (rootDepth > 6
+                && elapsedTime > minTime
+                && elapsedTime < maxTime
+                && !notSingular) {
+                dbg_mean_of(elapsed() - elapsedTime);
             }
 
             // Stop the search if we have exceeded the totalTime or maximum

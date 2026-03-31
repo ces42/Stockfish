@@ -329,8 +329,8 @@ bool dbg_hit_on(bool cond, int slot) {
 
 void dbg_mean_of(int64_t value, int slot) {
 
-    ++mean.at(slot)[0];
-    mean.at(slot)[1] += value;
+    // ++mean.at(slot)[0];
+    // mean.at(slot)[1] += value;
 }
 
 void dbg_stdev_of(int64_t value, int slot) {
