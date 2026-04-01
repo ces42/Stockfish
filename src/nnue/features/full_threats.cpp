@@ -135,8 +135,7 @@ constexpr auto init_threat_offsets() {
 
             else if (from >= SQ_A2 && from <= SQ_H7)
             {
-                Bitboard attacks = (pieceIdx < 8) ? pawn_attacks_bb<WHITE>(square_bb(from))
-                                                  : pawn_attacks_bb<BLACK>(square_bb(from));
+                Bitboard attacks = pawn_attacks_bb((pieceIdx < 8) ? WHITE : BLACK, square_bb(from));
                 cumulativePieceOffset += constexpr_popcount(attacks);
             }
         }
