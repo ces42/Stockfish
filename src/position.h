@@ -293,8 +293,7 @@ template<PieceType Pt>
 inline Bitboard Position::attacks_by(Color c) const {
 
     if constexpr (Pt == PAWN)
-        return c == WHITE ? pawn_attacks_bb<WHITE>(pieces(WHITE, PAWN))
-                          : pawn_attacks_bb<BLACK>(pieces(BLACK, PAWN));
+        return pawn_attacks_bb(c, pieces(c, PAWN));
     else
     {
         Bitboard threats   = 0;

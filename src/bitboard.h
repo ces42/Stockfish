@@ -149,10 +149,9 @@ constexpr Bitboard shift(Bitboard b) {
 
 // Returns the squares attacked by pawns of the given color
 // from the squares in the given bitboard.
-template<Color C>
-constexpr Bitboard pawn_attacks_bb(Bitboard b) {
-    return C == WHITE ? shift<NORTH_WEST>(b) | shift<NORTH_EAST>(b)
-                      : shift<SOUTH_WEST>(b) | shift<SOUTH_EAST>(b);
+constexpr Bitboard pawn_attacks_bb(Color c, Bitboard b) {
+    return c == WHITE ? (b & ~FileABB) << 7 | (b & ~FileHBB) << 9
+                      : (b & ~FileABB) >> 9 | (b & ~FileHBB) >> 7;
 }
 
 constexpr Bitboard pawn_single_push_bb(Color c, Bitboard b) {
@@ -388,8 +387,8 @@ inline constexpr auto PseudoAttacks = []() constexpr {
 
     for (Square s1 = SQ_A1; s1 <= SQ_H8; ++s1)
     {
-        attacks[WHITE][s1] = pawn_attacks_bb<WHITE>(square_bb(s1));
-        attacks[BLACK][s1] = pawn_attacks_bb<BLACK>(square_bb(s1));
+        attacks[WHITE][s1] = pawn_attacks_bb(WHITE, square_bb(s1));
+        attacks[BLACK][s1] = pawn_attacks_bb(BLACK, square_bb(s1));
 
         attacks[KING][s1]   = Bitboards::pseudo_attacks(KING, s1);
         attacks[KNIGHT][s1] = Bitboards::pseudo_attacks(KNIGHT, s1);
