@@ -143,7 +143,7 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
         Bitboard bb = pos.pieces(~us, BISHOP) | pos.pieces(~us, ROOK) | pos.pieces(~us, QUEEN);
         while (bb)
           knightOff |= PseudoAttacks[KNIGHT][pop_lsb(bb)];
-        knightOff &= ~threatByLesser[QUEEN];
+        knightOff &= ~threatByLesser[KING];
     }
 
     ExtMove* it = cur;
