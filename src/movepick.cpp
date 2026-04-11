@@ -153,7 +153,8 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
 
         if constexpr (Type == CAPTURES)
             m.value = (*captureHistory)[pc][to][type_of(capturedPiece)]
-                    + 7 * int(PieceValue[capturedPiece]);
+                    + 7 * int(PieceValue[capturedPiece])
+                    + 4096 * bool(move.type_of() == PROMOTION);
 
         else if constexpr (Type == QUIETS)
         {
