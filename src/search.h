@@ -175,10 +175,10 @@ struct LimitsType {
 // The UCI stores the uci options, thread pool, and transposition table.
 // This struct is used to easily forward data to the Search::Worker class.
 struct SharedState {
-    SharedState(const OptionsMap&                                         optionsMap,
-                ThreadPool&                                               threadPool,
-                TranspositionTable&                                       transpositionTable,
-                std::map<NumaIndex, SharedHistories>&                     sharedHists,
+    SharedState(const OptionsMap&                                        optionsMap,
+                ThreadPool&                                              threadPool,
+                TranspositionTable&                                      transpositionTable,
+                std::map<NumaIndex, SharedHistories>&                    sharedHists,
                 const LazyNumaReplicatedSystemWide<Eval::NNUE::Network>& net) :
         options(optionsMap),
         threads(threadPool),
@@ -186,10 +186,10 @@ struct SharedState {
         sharedHistories(sharedHists),
         network(net) {}
 
-    const OptionsMap&                                         options;
-    ThreadPool&                                               threads;
-    TranspositionTable&                                       tt;
-    std::map<NumaIndex, SharedHistories>&                     sharedHistories;
+    const OptionsMap&                                        options;
+    ThreadPool&                                              threads;
+    TranspositionTable&                                      tt;
+    std::map<NumaIndex, SharedHistories>&                    sharedHistories;
     const LazyNumaReplicatedSystemWide<Eval::NNUE::Network>& network;
 };
 
@@ -396,9 +396,9 @@ class Worker {
 
     Tablebases::Config tbConfig;
 
-    const OptionsMap&                                         options;
-    ThreadPool&                                               threads;
-    TranspositionTable&                                       tt;
+    const OptionsMap&                                        options;
+    ThreadPool&                                              threads;
+    TranspositionTable&                                      tt;
     const LazyNumaReplicatedSystemWide<Eval::NNUE::Network>& network;
 
     // Used by NNUE
