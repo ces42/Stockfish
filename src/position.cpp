@@ -1415,24 +1415,38 @@ void Position::undo_null_move() {
 bool Position::see_ge(Move m, int threshold) const {
 
     assert(m.is_ok());
-
-    // Only deal with normal moves, assume others pass a simple SEE
-    if (m.type_of() != NORMAL)
-        return VALUE_ZERO >= threshold;
-
     Square from = m.from_sq(), to = m.to_sq();
 
-    assert(piece_on(from) != NO_PIECE);
+    int swap;
+    if (m.type_of() == NORMAL)
+    {
+        assert(piece_on(from) != NO_PIECE);
 
-    int swap = PieceValue[piece_on(to)] - threshold;
-    if (swap < 0)
-        return false;
+        swap = PieceValue[piece_on(to)] - threshold;
+        if (swap < 0)
+            return false;
 
-    swap = PieceValue[piece_on(from)] - swap;
-    if (swap <= 0)
-        return true;
+        swap = PieceValue[piece_on(from)] - swap;
+        if (swap <= 0)
+            return true;
 
-    assert(color_of(piece_on(from)) == sideToMove);
+        assert(color_of(piece_on(from)) == sideToMove);
+    }
+    else if (m.type_of() == PROMOTION)
+    {
+        swap = QueenValue - PawnValue + PieceValue[piece_on(to)] - threshold;
+        if (swap < 0)
+            return false;
+
+        swap = QueenValue - swap;
+        if (swap <= 0)
+            return true;
+
+        assert(color_of(piece_on(from)) == sideToMove);
+    }
+    else
+        return VALUE_ZERO >= threshold;
+
     Bitboard occupied  = pieces() ^ from ^ to;  // xoring to is important for pinned piece logic
     Color    stm       = sideToMove;
     Bitboard attackers = attackers_to(to, occupied);
