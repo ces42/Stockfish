@@ -79,8 +79,6 @@ using NumaIndex = size_t;
 
 CpuIndex get_hardware_concurrency();
 
-extern const CpuIndex SYSTEM_THREADS_NB;
-
 #if defined(_WIN64)
 
 struct WindowsAffinity {

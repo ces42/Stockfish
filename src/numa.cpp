@@ -19,7 +19,6 @@
 #include "numa.h"
 
 #include <algorithm>
-#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
@@ -29,7 +28,6 @@
 #include <limits>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <set>
 #include <string>
@@ -904,7 +902,7 @@ std::vector<size_t> NumaConfig::indices_from_shortened_string(const std::string&
 // node. On Windows we utilize GetNumaProcessorNodeEx, which has its quirks, see
 // comment for Windows implementation of get_process_affinity.
 NumaConfig NumaConfig::from_system_numa([[maybe_unused]] bool respectProcessAffinity,
-                                   std::function<bool(CpuIndex)> is_cpu_allowed) {
+                                        std::function<bool(CpuIndex)> is_cpu_allowed) {
     NumaConfig cfg = empty();
 
 #if defined(__linux__) && !defined(__ANDROID__)
