@@ -253,11 +253,7 @@ WindowsAffinity get_process_affinity() {
 
 std::set<CpuIndex> readCacheMembers(const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* info, std::function<bool(CpuIndex)> is_cpu_allowed) {
     std::set<CpuIndex> cpus;
-
-    // Use a runtime check for GroupCount as it's not present in all Windows versions' headers.
-    // However, for Stockfish we can assume a modern enough SDK.
-    // The original code used a template trick to handle missing GroupCount.
-    // Here we'll use the GroupCount if available in our build environment.
+    // On Windows 10 this will read a 0 because GroupCount doesn't exist
     int groupCount = std::max<int>(info->Cache.GroupCount, 1);
     for (WORD procGroup = 0; procGroup < groupCount; ++procGroup)
     {
