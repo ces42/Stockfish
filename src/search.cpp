@@ -565,7 +565,7 @@ void Search::Worker::do_move(Position& pos, const Move move, StateInfo& st, Stac
 
 void Search::Worker::do_move(
   Position& pos, const Move move, StateInfo& st, const bool givesCheck, Stack* const ss) {
-    bool capture = pos.capture_stage(move);
+    bool captureStage = pos.capture_stage(move);
     // Preferable over fetch_add to avoid locking instructions
     nodes.store(nodes.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
 
@@ -576,7 +576,7 @@ void Search::Worker::do_move(
     {
         ss->currentMove = move;
         ss->continuationHistory =
-          &continuationHistory[ss->inCheck][capture][dirtyPiece.pc][move.to_sq()];
+          &continuationHistory[ss->inCheck][captureStage][dirtyPiece.pc][move.to_sq()];
         ss->continuationCorrectionHistory =
           &continuationCorrectionHistory[dirtyPiece.pc][move.to_sq()];
     }
@@ -661,8 +661,8 @@ Value Search::Worker::search(
     Move  move, excludedMove, bestMove;
     Depth extension, newDepth;
     Value bestValue, value, eval, maxValue, probCutBeta;
-    bool  givesCheck, improving, priorCapture, opponentWorsening;
-    bool  capture, ttCapture;
+    bool  givesCheck, improving, priorCaptureStage, opponentWorsening;
+    bool  captureStage, ttCapture;
     int   priorReduction;
     Piece movedPiece;
 
@@ -671,7 +671,7 @@ Value Search::Worker::search(
 
     // Step 1. Initialize node
     ss->inCheck   = pos.checkers();
-    priorCapture  = pos.captured_piece();
+    priorCaptureStage  = pos.captured_piece() || (!rootNode && (ss-1)->currentMove.type_of() == PROMOTION);
     Color us      = pos.side_to_move();
     ss->moveCount = 0;
     bestValue     = -VALUE_INFINITE;
@@ -790,7 +790,7 @@ Value Search::Worker::search(
                                        std::min(119 * depth - 74, 855));
 
             // Extra penalty for early quiet moves of the previous ply
-            if (prevSq != SQ_NONE && (ss - 1)->moveCount < 4 && !priorCapture)
+            if (prevSq != SQ_NONE && (ss - 1)->moveCount < 4 && !priorCaptureStage)
                 update_continuation_histories(ss - 1, pos.piece_on(prevSq), prevSq, -2014);
         }
 
@@ -876,7 +876,7 @@ Value Search::Worker::search(
         goto moves_loop;
 
     // Use static evaluation difference to improve quiet move ordering
-    if (((ss - 1)->currentMove).is_ok() && !(ss - 1)->inCheck && !priorCapture)
+    if (((ss - 1)->currentMove).is_ok() && !(ss - 1)->inCheck && !priorCaptureStage)
     {
         int evalDiff = std::clamp(-int((ss - 1)->staticEval + ss->staticEval), -214, 171) + 60;
         mainHistory[~us][((ss - 1)->currentMove).raw()] << evalDiff * 10;
@@ -1047,7 +1047,7 @@ moves_loop:  // When in check, search starts here
             (ss + 1)->pv = nullptr;
 
         extension  = 0;
-        capture    = pos.capture_stage(move);
+        captureStage    = pos.capture_stage(move);
         movedPiece = pos.moved_piece(move);
         givesCheck = pos.gives_check(move);
 
@@ -1074,7 +1074,7 @@ moves_loop:  // When in check, search starts here
             // Reduced depth of the next LMR search
             int lmrDepth = newDepth - r / 1024;
 
-            if (capture || givesCheck)
+            if (captureStage || givesCheck)
             {
                 Piece capturedPiece = pos.piece_on(move.to_sq());
                 int   captHist = captureHistory[movedPiece][move.to_sq()][type_of(capturedPiece)];
@@ -1230,7 +1230,7 @@ moves_loop:  // When in check, search starts here
         if (move == ttData.move)
             r -= 2239;
 
-        if (capture)
+        if (captureStage)
             ss->statScore = 863 * int(PieceValue[pos.captured_piece()]) / 128
                           + captureHistory[movedPiece][move.to_sq()][type_of(pos.captured_piece())];
         else
@@ -1407,7 +1407,7 @@ moves_loop:  // When in check, search starts here
         // remember it, to update its stats later.
         if (move != bestMove && moveCount <= SEARCHEDLIST_CAPACITY)
         {
-            if (capture)
+            if (captureStage)
                 capturesSearched.push_back(move);
             else
                 quietsSearched.push_back(move);
@@ -1439,7 +1439,7 @@ moves_loop:  // When in check, search starts here
     }
 
     // Bonus for prior quiet countermove that caused the fail low
-    else if (!priorCapture && prevSq != SQ_NONE)
+    else if (!priorCaptureStage && prevSq != SQ_NONE)
     {
         int bonusScale = -232;
         bonusScale -= (ss - 1)->statScore / 108;
@@ -1463,10 +1463,10 @@ moves_loop:  // When in check, search starts here
     }
 
     // Bonus for prior capture countermove that caused the fail low
-    else if (priorCapture && prevSq != SQ_NONE)
+    else if (priorCaptureStage && prevSq != SQ_NONE)
     {
         Piece capturedPiece = pos.captured_piece();
-        assert(capturedPiece != NO_PIECE);
+        assert(capturedPiece != NO_PIECE || (ss-1)->currentMove.type_of() == PROMOTION);
         captureHistory[pos.piece_on(prevSq)][prevSq][type_of(capturedPiece)] << 1018;
     }
 
