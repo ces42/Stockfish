@@ -28,6 +28,7 @@
 #include <string>
 #include <initializer_list>
 #include <array>
+#include "immintrin.h"
 
 #include "types.h"
 

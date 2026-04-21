@@ -139,11 +139,14 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
         threatByLesser[QUEEN] = pos.attacks_by<ROOK>(~us) | threatByLesser[ROOK];
         threatByLesser[KING]  = 0;
 
-        Bitboard bb = pos.pieces(~us, KNIGHT) | pos.pieces(~us, BISHOP) | pos.pieces(~us, ROOK) | pos.pieces(~us, QUEEN);
+        Bitboard bb = pos.pieces(~us, BISHOP) | pos.pieces(~us, ROOK) | pos.pieces(~us, QUEEN);
         // while (bb)
         //   knightOff |= PseudoAttacks[KNIGHT][pop_lsb(bb)];
-        offense[KNIGHT] = knight_attacks_setwise(bb) & ~threatByLesser[KING];
-        offense[BISHOP] = bishop_attacks_setwise(pos.pieces(~us, ROOK), pos.pieces()) & ~threatByLesser[KING];
+        offense[KNIGHT] = knight_attacks_setwise(bb) & ~threatByLesser[QUEEN];
+        offense[BISHOP] = bishop_attacks_setwise(
+                              pos.pieces(~us, ROOK),
+                              pos.pieces()
+                          ) & ~threatByLesser[QUEEN];
     }
 
     ExtMove* it = cur;
