@@ -295,6 +295,10 @@ inline Bitboard Position::attacks_by(Color c) const {
     if constexpr (Pt == PAWN)
         return c == WHITE ? pawn_attacks_bb<WHITE>(pieces(WHITE, PAWN))
                           : pawn_attacks_bb<BLACK>(pieces(BLACK, PAWN));
+    else if (Pt == KNIGHT)
+        return knight_attacks_setwise(pieces(c, KNIGHT));
+    else if (Pt == BISHOP)
+        return bishop_attacks_setwise(pieces(c, BISHOP), pieces());
     else
     {
         Bitboard threats   = 0;

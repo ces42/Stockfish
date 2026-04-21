@@ -431,6 +431,65 @@ inline Bitboard attacks_bb(Square s, Color c = COLOR_NB) {
     return Pt == PAWN ? PseudoAttacks[c][s] : PseudoAttacks[Pt][s];
 }
 
+inline Bitboard fold(__m256i vector4) {
+    __m128i vector2 = _mm_or_si128(_mm256_castsi256_si128(vector4), _mm256_extracti128_si256(vector4, 1));
+
+    return _mm_extract_epi64(vector2, 0) | _mm_extract_epi64(vector2, 1);
+}
+
+inline __m256i shiftv(__m256i vector, int64_t A, int64_t B, int64_t C, int64_t D) {
+    return _mm256_or_si256(
+        _mm256_sllv_epi64(vector, _mm256_set_epi64x(A, B, C, D)),
+        _mm256_srlv_epi64(vector, _mm256_set_epi64x(-A, -B, -C, -D))
+    );
+}
+
+inline Bitboard knight_attacks_setwise(Bitboard knights) {
+    __m256i mask_a = _mm256_set_epi64x(
+        ~(FileABB | FileBBB | Rank8BB),
+        ~(FileABB | Rank7BB | Rank8BB),
+        ~(FileHBB | Rank7BB | Rank8BB),
+        ~(FileGBB | FileHBB | Rank8BB)
+    );
+    __m256i mask_b = _mm256_set_epi64x(
+        ~(FileGBB | FileHBB | Rank1BB),
+        ~(FileHBB | Rank1BB | Rank2BB),
+        ~(FileABB | Rank1BB | Rank2BB),
+        ~(FileABB | FileBBB | Rank1BB)
+    );
+
+    __m256i bb = _mm256_set1_epi64x(knights);
+    __m256i a = _mm256_and_si256(bb, mask_a);
+    __m256i b = _mm256_and_si256(bb, mask_b);
+    a = _mm256_sllv_epi64(a, _mm256_set_epi64x(6, 15, 17, 10));
+    b = _mm256_srlv_epi64(b, _mm256_set_epi64x(6, 15, 17, 10));
+    Bitboard result = fold(_mm256_or_si256(a, b));
+
+    #ifndef NDEBUG
+    Bitboard check = 0ULL;
+    while (knights)
+        check |= PseudoAttacks[KNIGHT][pop_lsb(knights)];
+    assert(check == result);
+    #endif
+    return result;
+}
+
+inline Bitboard bishop_attacks_setwise(Bitboard bb, Bitboard occupancies) {
+    __m256i mask = _mm256_set_epi64x(~(Rank8BB | FileHBB), ~(Rank8BB | FileABB), ~(Rank1BB | FileHBB), ~(Rank1BB | FileABB));
+
+    __m256i generate = _mm256_set1_epi64x(bb);
+    __m256i propagate = _mm256_and_si256(_mm256_set1_epi64x(~occupancies), mask);
+
+    generate = _mm256_or_si256(generate, _mm256_and_si256(propagate, shiftv(generate,-9, -7, 7, 9)));
+    propagate = _mm256_and_si256(propagate, shiftv(propagate, -9, -7, 7, 9));
+
+    generate = _mm256_or_si256(generate, _mm256_and_si256(propagate, shiftv(generate, -18, -14, 14, 18)));
+    propagate = _mm256_and_si256(propagate, shiftv(propagate, -18, -14, 14, 18));
+
+    generate = _mm256_or_si256(generate, _mm256_and_si256(propagate, shiftv(generate, -36, -28, 28, 36)));
+    return fold(_mm256_and_si256(shiftv(generate, -9, -7, 7, 9), mask));
+}
+
 
 // Returns the attacks by the given piece
 // assuming the board is occupied according to the passed Bitboard.
