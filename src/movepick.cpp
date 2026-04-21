@@ -129,7 +129,7 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
     Color us = pos.side_to_move();
 
     [[maybe_unused]] Bitboard threatByLesser[KING + 1];
-    [[maybe_unused]] Bitboard knightOff, bishopOff;
+    [[maybe_unused]] Bitboard offense[KING + 1] = {0, 0, 0, 0, 0, 0, 0};
     if constexpr (Type == QUIETS)
     {
         threatByLesser[PAWN]   = 0;
@@ -142,8 +142,8 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
         Bitboard bb = pos.pieces(~us, KNIGHT) | pos.pieces(~us, BISHOP) | pos.pieces(~us, ROOK) | pos.pieces(~us, QUEEN);
         // while (bb)
         //   knightOff |= PseudoAttacks[KNIGHT][pop_lsb(bb)];
-        knightOff = knight_attacks_setwise(bb) & ~threatByLesser[KING];
-        bishopOff = bishop_attacks_setwise(bb, pos.pieces()) & ~threatByLesser[KING];
+        offense[KNIGHT] = knight_attacks_setwise(bb) & ~threatByLesser[KING];
+        offense[BISHOP] = bishop_attacks_setwise(pos.pieces(~us, ROOK), pos.pieces()) & ~threatByLesser[KING];
     }
 
     ExtMove* it = cur;
@@ -181,8 +181,7 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
             int v = 20 * (bool(threatByLesser[pt] & from) - bool(threatByLesser[pt] & to));
             m.value += PieceValue[pt] * v;
 
-            m.value += (pt == KNIGHT && bool(knightOff & to)) * 12000;
-            m.value += (pt == BISHOP && bool(bishopOff & to)) * 12000;
+            m.value += bool(offense[pt] & to) * 12000;
 
             if (ply < LOW_PLY_HISTORY_SIZE)
                 m.value += 8 * (*lowPlyHistory)[ply][m.raw()] / (1 + ply);
