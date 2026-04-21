@@ -1408,6 +1408,7 @@ void Position::undo_null_move() {
     sideToMove = ~sideToMove;
 }
 
+constexpr Value PromotingPawnValue = 2.3 * PawnValue;
 
 // Tests if the SEE (Static Exchange Evaluation)
 // value of the move is greater or equal to the given threshold. We'll use an
@@ -1434,7 +1435,7 @@ bool Position::see_ge(Move m, int threshold) const {
     }
     else if (m.type_of() == PROMOTION)
     {
-        swap = QueenValue - PawnValue + PieceValue[piece_on(to)] - threshold;
+        swap = QueenValue - PromotingPawnValue + PieceValue[piece_on(to)] - threshold;
         if (swap < 0)
             return false;
 
