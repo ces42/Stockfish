@@ -57,7 +57,10 @@ Value Eval::evaluate(const Eval::NNUE::Networks&    networks,
     assert(!pos.checkers());
 
     Value simpleEval        = simple_eval(pos);
-    bool  smallNet          = std::abs(simpleEval) > 1010;
+    bool  smallNet          = std::abs(simpleEval) > std::max(962, 1350 - 20 * pos.count<ALL_PIECES>());
+    // dbg_hit_on(smallNet);
+    // dbg_hit_on(std::abs(simpleEval) > 1010, 1);
+    // dbg_hit_on(std::abs(simpleEval) > 962, 2);
     auto [psqt, positional] = smallNet ? networks.small.evaluate(pos, accumulators, caches.small)
                                        : networks.big.evaluate(pos, accumulators, caches.big);
 
@@ -127,8 +130,8 @@ std::string Eval::trace(Position& pos, const Eval::NNUE::Networks& networks) {
     Value v = evaluate(networks, pos, *accumulators, *caches, VALUE_ZERO);
     v       = pos.side_to_move() == WHITE ? v : -v;
 
-    ss << "Final evaluation " << "(using "
-       << (use_smallnet(pos) && !useBig ? "small net) " : "big net)   ");
+    // ss << "Final evaluation " << "(using "
+    //    << (use_smallnet(pos) && !useBig ? "small net) " : "big net)   ");
     ss << 0.01 * UCIEngine::to_cp(v, pos) << " (white side)";
     ss << " [with scaled NNUE, ...]\n";
 
