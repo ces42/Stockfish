@@ -180,7 +180,7 @@ class FeatureTransformer {
                   combinedPsqtWeights->begin());
 
         std::copy(std::begin(copy->psqtWeights),
-                  std::begin(copy->psqtWeights) + InputDimensions * PSQTBuckets,
+                  std::begin(copy->psqtWeights) + PSQFeatureSet::Dimensions * PSQTBuckets,
                   combinedPsqtWeights->begin() + ThreatFeatureSet::Dimensions * PSQTBuckets);
 
         write_leb_128<PSQTWeightType>(stream, *combinedPsqtWeights);

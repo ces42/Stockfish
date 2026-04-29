@@ -59,25 +59,6 @@ const unsigned char gEmbeddedNNUEData[1] = {0x0};
 const unsigned int  gEmbeddedNNUESize    = 1;
 #endif
 
-namespace {
-
-struct EmbeddedNNUE {
-    EmbeddedNNUE(const unsigned char* embeddedData, const unsigned int embeddedSize) :
-        data(embeddedData),
-        end(embeddedData + embeddedSize),
-        size(embeddedSize) {}
-    const unsigned char* data;
-    const unsigned char* end;
-    const unsigned int   size;
-};
-
-using namespace Stockfish::Eval::NNUE;
-
-EmbeddedNNUE get_embedded() { return EmbeddedNNUE(gEmbeddedNNUEData, gEmbeddedNNUESize); }
-
-}
-
-
 namespace Stockfish::Eval::NNUE {
 
 
@@ -269,10 +250,8 @@ void Network::load_internal() {
         }
     };
 
-    const auto embedded = get_embedded();
-
-    MemoryBuffer buffer(const_cast<char*>(reinterpret_cast<const char*>(embedded.data)),
-                        size_t(embedded.size));
+    MemoryBuffer buffer(const_cast<char*>(reinterpret_cast<const char*>(gEmbeddedNNUEData)),
+                        size_t(gEmbeddedNNUESize));
 
     std::istream stream(&buffer);
     auto         description = load(stream);

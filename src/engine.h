@@ -89,8 +89,8 @@ class Engine {
 
     void                                 verify_network() const;
     std::unique_ptr<Eval::NNUE::Network> get_default_network() const;
-    void                                 load_network(const std::string& file);
-    void save_network(std::pair<std::optional<std::string>, std::string> files);
+    void                                  load_network(const std::string& file);
+    void save_network(std::pair<std::optional<std::string>, std::string> file);
 
     // utility functions
 
@@ -124,7 +124,7 @@ class Engine {
     LazyNumaReplicatedSystemWide<Eval::NNUE::Network> network;
 
     Search::SearchManager::UpdateContext  updateContext;
-    std::function<void(std::string_view)> onVerifyNetworks;
+    std::function<void(std::string_view)> onVerifyNetwork;
     std::map<NumaIndex, SharedHistories>  sharedHists;
 };
 

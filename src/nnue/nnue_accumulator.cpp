@@ -177,7 +177,7 @@ void AccumulatorStack::forward_update_incremental(Color                     pers
                                                   const std::size_t         begin) noexcept {
 
     assert(begin < accumulators<FeatureSet>().size());
-    assert((accumulators<FeatureSet>()[begin].template acc<Dimensions>()).computed[perspective]);
+    assert(accumulators<FeatureSet>()[begin].computed[perspective]);
 
     const Square ksq = pos.square<KING>(perspective);
 
@@ -188,7 +188,7 @@ void AccumulatorStack::forward_update_incremental(Color                     pers
                                              accumulators<FeatureSet>()[next - 1]);
     }
 
-    assert((latest<PSQFeatureSet>().acc<Dimensions>()).computed[perspective]);
+    assert(latest<PSQFeatureSet>().computed[perspective]);
 }
 
 template<typename FeatureSet>
@@ -200,7 +200,7 @@ void AccumulatorStack::backward_update_incremental(Color perspective,
 
     assert(end < accumulators<FeatureSet>().size());
     assert(end < size);
-    assert((latest<FeatureSet>().template acc<Dimensions>()).computed[perspective]);
+    assert(latest<FeatureSet>().computed[perspective]);
 
     const Square ksq = pos.square<KING>(perspective);
 
@@ -209,7 +209,7 @@ void AccumulatorStack::backward_update_incremental(Color perspective,
                                               mut_accumulators<FeatureSet>()[next],
                                               accumulators<FeatureSet>()[next + 1]);
 
-    assert((accumulators<FeatureSet>()[end].template acc<Dimensions>()).computed[perspective]);
+    assert(accumulators<FeatureSet>()[end].computed[perspective]);
 }
 
 namespace {
@@ -281,7 +281,7 @@ struct AccumulatorUpdateContext {
         auto&       toPsqtAcc   = to.psqtAccumulation[perspective];
 
 #ifdef VECTOR
-        using Tiling [[maybe_unused]] = SIMDTiling<Dimensions, Dimensions, PSQTBuckets>;
+        using Tiling = SIMDTiling<Dimensions, Dimensions, PSQTBuckets>;
 
         vec_t      acc[Tiling::NumRegs];
         psqt_vec_t psqt[Tiling::NumPsqtRegs];

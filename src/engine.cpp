@@ -183,7 +183,7 @@ void Engine::set_on_bestmove(std::function<void(std::string_view, std::string_vi
 }
 
 void Engine::set_on_verify_network(std::function<void(std::string_view)>&& f) {
-    onVerifyNetworks = std::move(f);
+    onVerifyNetwork = std::move(f);
 }
 
 void Engine::wait_for_search_finished() { threads.main_thread()->wait_for_search_finished(); }
@@ -256,7 +256,7 @@ void Engine::set_ponderhit(bool b) { threads.main_manager()->ponder = b; }
 // network related
 
 void Engine::verify_network() const {
-    network->verify(options["EvalFile"], onVerifyNetworks);
+    network->verify(options["EvalFile"], onVerifyNetwork);
 
     auto statuses = network.get_status_and_errors();
     for (size_t i = 0; i < statuses.size(); ++i)
@@ -285,28 +285,31 @@ void Engine::verify_network() const {
             message += " " + *error;
         }
 
-        onVerifyNetworks(message);
+        onVerifyNetwork(message);
     }
 }
 
 std::unique_ptr<Eval::NNUE::Network> Engine::get_default_network() const {
 
-    auto networks_ = std::make_unique<NN::Network>(NN::EvalFile{EvalFileDefaultName, "None", ""});
+    auto network_ =
+      std::make_unique<NN::Network>(NN::EvalFile{EvalFileDefaultName, "None", ""});
 
-    networks_->load(binaryDirectory, "");
+    network_->load(binaryDirectory, "");
 
-    return networks_;
+    return network_;
 }
 
 void Engine::load_network(const std::string& file) {
     network.modify_and_replicate(
-      [this, &file](NN::Network& networks_) { networks_.load(binaryDirectory, file); });
+      [this, &file](NN::Network& network_) { network_.load(binaryDirectory, file); });
     threads.clear();
     threads.ensure_network_replicated();
 }
 
 void Engine::save_network(const std::pair<std::optional<std::string>, std::string> file) {
-    network.modify_and_replicate([&file](NN::Network& networks_) { networks_.save(file.first); });
+    network.modify_and_replicate([&file](NN::Network& network_) {
+        network_.save(file.first);
+    });
 }
 
 // utility functions
