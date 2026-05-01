@@ -48,7 +48,7 @@ using NetworkOutput = std::tuple<Value, Value>;
 // The network must be a trivial type, i.e. the memory must be in-line.
 // This is required to allow sharing the network via shared memory, as
 // there is no way to run destructors.
-class Network {
+struct Network {
    public:
     Network(EvalFile file) :
         evalFile(file) {}
