@@ -694,7 +694,7 @@ Value Search::Worker::search(
         // Step 2. Check for aborted search and immediate draw
         if (threads.stop.load(std::memory_order_relaxed) || pos.is_draw(ss->ply)
             || ss->ply >= MAX_PLY)
-            return (ss->ply >= MAX_PLY && !ss->inCheck) ? evaluate(pos) : value_draw(nodes);
+            return (ss->ply >= MAX_PLY && !ss->inCheck) ? evaluate(pos, depth) : value_draw(nodes);
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply + 1), but if alpha is already bigger because
@@ -741,7 +741,7 @@ Value Search::Worker::search(
         // Never assume anything about values stored in TT
         unadjustedStaticEval = ttData.eval;
         if (!is_valid(unadjustedStaticEval))
-            unadjustedStaticEval = evaluate(pos);
+            unadjustedStaticEval = evaluate(pos, depth);
 
         ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, correctionValue);
 
@@ -752,7 +752,7 @@ Value Search::Worker::search(
     }
     else
     {
-        unadjustedStaticEval = evaluate(pos);
+        unadjustedStaticEval = evaluate(pos, depth);
         ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, correctionValue);
 
         // Static evaluation is saved as it was before adjustment by correction history
@@ -1554,7 +1554,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
     // Step 2. Check for an immediate draw or maximum ply reached
     if (pos.is_draw(ss->ply) || ss->ply >= MAX_PLY)
-        return (ss->ply >= MAX_PLY && !ss->inCheck) ? evaluate(pos) : VALUE_DRAW;
+        return (ss->ply >= MAX_PLY && !ss->inCheck) ? evaluate(pos, 0) : VALUE_DRAW;
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
@@ -1575,51 +1575,66 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
     // Step 4. Static evaluation of the position
     Value unadjustedStaticEval = VALUE_NONE;
+    Value simp_ev;
+    bool skipEval = false;
     if (ss->inCheck)
-        bestValue = futilityBase = -VALUE_INFINITE;
+    {
+        bestValue = futilityBase = Eval::simple_eval(pos) - 500;
+    }
     else
     {
-        const auto correctionValue = correction_value(*this, pos, ss);
-
-        if (ss->ttHit)
-        {
-            // Never assume anything about values stored in TT
-            unadjustedStaticEval = ttData.eval;
-
-            if (!is_valid(unadjustedStaticEval))
-                unadjustedStaticEval = evaluate(pos);
-
-            ss->staticEval = bestValue =
-              to_corrected_static_eval(unadjustedStaticEval, correctionValue);
-
-            // ttValue can be used as a better position evaluation
-            if (is_valid(ttData.value) && !is_decisive(ttData.value)
-                && (ttData.bound & (ttData.value > bestValue ? BOUND_LOWER : BOUND_UPPER)))
-                bestValue = ttData.value;
+        simp_ev = Eval::simple_eval(pos);
+        if (std::abs(simp_ev) > 960 && simp_ev < alpha - 500) {
+            // dbg_hit_on(type_of(pos.captured_piece()) > PAWN, 10);
+            skipEval = true;
+            bestValue = futilityBase = simp_ev - 500;
         }
         else
         {
-            unadjustedStaticEval = evaluate(pos);
-            ss->staticEval       = bestValue =
-              to_corrected_static_eval(unadjustedStaticEval, correctionValue);
+            const auto correctionValue = correction_value(*this, pos, ss);
+
+            if (ss->ttHit)
+            {
+                // Never assume anything about values stored in TT
+                unadjustedStaticEval = ttData.eval;
+
+                if (!is_valid(unadjustedStaticEval))
+                {
+                    unadjustedStaticEval = evaluate(pos, 0);
+                }
+
+                ss->staticEval = bestValue =
+                    to_corrected_static_eval(unadjustedStaticEval, correctionValue);
+
+                // ttValue can be used as a better position evaluation
+                if (is_valid(ttData.value) && !is_decisive(ttData.value)
+                    && (ttData.bound & (ttData.value > bestValue ? BOUND_LOWER : BOUND_UPPER)))
+                    bestValue = ttData.value;
+            }
+            else
+            {
+                unadjustedStaticEval = evaluate(pos, 0);
+                ss->staticEval       = bestValue =
+                    to_corrected_static_eval(unadjustedStaticEval, correctionValue);
+            }
+
+            // Stand pat. Return immediately if static value is at least beta
+            if (bestValue >= beta)
+            {
+                if (!is_decisive(bestValue))
+                    bestValue = (bestValue + beta) / 2;
+
+                if (!ss->ttHit)
+                    ttWriter.write(posKey, VALUE_NONE, false, BOUND_LOWER, DEPTH_UNSEARCHED,
+                                   Move::none(), unadjustedStaticEval, tt.generation());
+                return bestValue;
+            }
+
+            if (bestValue > alpha)
+                alpha = bestValue;
+
+            futilityBase = ss->staticEval + 328;
         }
-
-        // Stand pat. Return immediately if static value is at least beta
-        if (bestValue >= beta)
-        {
-            if (!is_decisive(bestValue))
-                bestValue = (bestValue + beta) / 2;
-
-            if (!ss->ttHit)
-                ttWriter.write(posKey, VALUE_NONE, false, BOUND_LOWER, DEPTH_UNSEARCHED,
-                               Move::none(), unadjustedStaticEval, tt.generation());
-            return bestValue;
-        }
-
-        if (bestValue > alpha)
-            alpha = bestValue;
-
-        futilityBase = ss->staticEval + 328;
     }
 
     const PieceToHistory* contHist[] = {(ss - 1)->continuationHistory};
@@ -1730,6 +1745,13 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
             && !MoveList<LEGAL>(pos).size())
             bestValue = VALUE_DRAW;
     }
+    if (skipEval && bestValue == simp_ev - 500)
+    {
+        // assert(Eval::use_smallnet(pos));
+        unadjustedStaticEval = evaluate(pos, 0);
+        const auto correctionValue = correction_value(*this, pos, ss);
+        bestValue = to_corrected_static_eval(unadjustedStaticEval, correctionValue);
+    }
 
     if (!is_decisive(bestValue) && bestValue > beta)
         bestValue = (bestValue + beta) / 2;
@@ -1764,7 +1786,13 @@ TimePoint Search::Worker::elapsed() const {
 
 TimePoint Search::Worker::elapsed_time() const { return main_manager()->tm.elapsed_time(); }
 
-Value Search::Worker::evaluate(const Position& pos) {
+Value Search::Worker::evaluate(const Position& pos, Depth d) {
+    // dbg_hit_on(pos.captured_piece(), 21);
+    // if (Eval::use_smallnet(pos))
+    //     dbg_hit_on(pos.captured_piece());
+    dbg_hit_on(Eval::use_smallnet(pos), d > 0);
+    if (Eval::use_smallnet(pos) && d > 0)
+        dbg_hit_on(pos.captured_piece(), 5);
     return Eval::evaluate(networks[numaAccessToken], pos, accumulatorStack, refreshTable,
                           optimism[pos.side_to_move()]);
 }
