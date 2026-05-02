@@ -1599,14 +1599,6 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
         bestValue = futilityBase = -VALUE_INFINITE;
     else
     {
-    Value simp_ev = Eval::simple_eval(pos);
-    if (std::abs(simp_ev) > 960 && simp_ev < alpha - 500) {
-        // dbg_hit_on(type_of(pos.captured_piece()) > PAWN, 10);
-        skipEval = true;
-        bestValue = futilityBase = -VALUE_INFINITE;
-    }
-    else
-    {
         const auto correctionValue = correction_value(*this, pos, ss);
 
         if (ss->ttHit)
@@ -1615,7 +1607,21 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
             unadjustedStaticEval = ttData.eval;
 
             if (!is_valid(unadjustedStaticEval))
-                unadjustedStaticEval = evaluate(pos);
+            {
+                Value simp_ev = Eval::simple_eval(pos);
+                if (simp_ev < -950 && simp_ev < alpha - 300 && ttData.move && pos.capture(ttData.move)) {
+                    // dbg_hit_on(type_of(pos.captured_piece()) > PAWN, 10);
+                    skipEval = true;
+                    bestValue = futilityBase = -VALUE_INFINITE;
+                    // ttValue can be used as a better position evaluation
+                    if (is_valid(ttData.value) && !is_decisive(ttData.value)
+                        && (ttData.bound & (ttData.value > bestValue ? BOUND_LOWER : BOUND_UPPER)))
+                        bestValue = ttData.value;
+                    goto end;
+                }
+                else
+                    unadjustedStaticEval = evaluate(pos);
+            }
 
             ss->staticEval = bestValue =
               to_corrected_static_eval(unadjustedStaticEval, correctionValue);
@@ -1627,9 +1633,19 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
         }
         else
         {
-            unadjustedStaticEval = evaluate(pos);
-            ss->staticEval       = bestValue =
-              to_corrected_static_eval(unadjustedStaticEval, correctionValue);
+            Value simp_ev = Eval::simple_eval(pos);
+            if (simp_ev < -950 && simp_ev < alpha - 500) {
+                // dbg_hit_on(type_of(pos.captured_piece()) > PAWN, 10);
+                skipEval = true;
+                bestValue = futilityBase = -VALUE_INFINITE;
+                goto end;
+            }
+            else
+            {
+                unadjustedStaticEval = evaluate(pos);
+                ss->staticEval       = bestValue =
+                    to_corrected_static_eval(unadjustedStaticEval, correctionValue);
+            }
         }
 
         // Stand pat. Return immediately if static value is at least beta
@@ -1649,7 +1665,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
         futilityBase = ss->staticEval + 328;
     }
-    }
+end:
 
     const PieceToHistory* contHist[] = {(ss - 1)->continuationHistory};
 
