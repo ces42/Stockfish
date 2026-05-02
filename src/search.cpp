@@ -1594,17 +1594,16 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
     // Step 4. Static evaluation of the position
     Value unadjustedStaticEval = VALUE_NONE;
-    Value simp_ev;
     bool skipEval = false;
     if (ss->inCheck)
         bestValue = futilityBase = -VALUE_INFINITE;
     else
     {
-    simp_ev = Eval::simple_eval(pos);
+    Value simp_ev = Eval::simple_eval(pos);
     if (std::abs(simp_ev) > 960 && simp_ev < alpha - 500) {
         // dbg_hit_on(type_of(pos.captured_piece()) > PAWN, 10);
         skipEval = true;
-        bestValue = futilityBase = simp_ev - 500;
+        bestValue = futilityBase = -VALUE_INFINITE;
     }
     else
     {
@@ -1760,7 +1759,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
             && !MoveList<LEGAL>(pos).size())
             bestValue = VALUE_DRAW;
     }
-    if (skipEval && bestValue == simp_ev - 500)
+    if (skipEval && bestValue == -VALUE_INFINITE)
     {
         // assert(Eval::use_smallnet(pos));
         unadjustedStaticEval = evaluate(pos);
