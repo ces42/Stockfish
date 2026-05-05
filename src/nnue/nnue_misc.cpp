@@ -59,7 +59,7 @@ trace(Position& pos, const Eval::NNUE::Network& network, Eval::NNUE::Accumulator
 
     std::stringstream ss;
 
-    auto accumulators = std::make_unique<AccumulatorStack>();
+    auto accumulators = std::make_unique<AccumulatorStack>(network);
     accumulators->reset();
 
     auto t = network.trace_evaluate(pos, *accumulators, caches);

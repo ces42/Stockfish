@@ -39,6 +39,7 @@ namespace Stockfish::Eval::NNUE {
 
 struct alignas(CacheLineSize) Accumulator;
 
+class Network;
 class FeatureTransformer;
 
 // Class that holds the result of affine transformation of input features
@@ -106,6 +107,7 @@ struct AccumulatorState: public Accumulator {
 
 class AccumulatorStack {
    public:
+    AccumulatorStack(const Network& network);
     static constexpr std::size_t MaxSize = MAX_PLY + 1;
 
     template<typename T>
@@ -121,6 +123,7 @@ class AccumulatorStack {
                   [[maybe_unused]] AccumulatorCaches& cache) noexcept;
 
    private:
+    const FeatureTransformer& featT;
     template<typename T>
     [[nodiscard]] AccumulatorState<T>& mut_latest() noexcept;
 

@@ -174,6 +174,7 @@ Search::Worker::Worker(SharedState&                    sharedState,
     threads(sharedState.threads),
     tt(sharedState.tt),
     network(sharedState.network),
+    accumulatorStack(network[token]),
     refreshTable(network[token]) {
     clear();
 }

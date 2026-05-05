@@ -76,7 +76,7 @@ std::string Eval::trace(Position& pos, const Eval::NNUE::Network& network) {
     if (pos.checkers())
         return "Final evaluation: none (in check)";
 
-    auto accumulators = std::make_unique<Eval::NNUE::AccumulatorStack>();
+    auto accumulators = std::make_unique<Eval::NNUE::AccumulatorStack>(network);
     auto caches       = std::make_unique<Eval::NNUE::AccumulatorCaches>(network);
 
     std::stringstream ss;

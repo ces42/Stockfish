@@ -27,6 +27,7 @@
 #include "../misc.h"
 #include "../position.h"
 #include "../types.h"
+#include "network.h"
 #include "nnue_architecture.h"
 #include "nnue_common.h"
 #include "nnue_feature_transformer.h"  // IWYU pragma: keep
@@ -35,6 +36,9 @@
 namespace Stockfish::Eval::NNUE {
 
 using namespace SIMD;
+
+AccumulatorStack::AccumulatorStack(const Network& network) 
+    : featT(network.featureTransformer) {}
 
 namespace {
 

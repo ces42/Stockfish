@@ -104,6 +104,7 @@ class Network {
       FeatureTransformer::get_hash_value() ^ NetworkArchitecture::get_hash_value();
 
     friend struct AccumulatorCaches;
+    friend class AccumulatorStack;
 };
 
 
