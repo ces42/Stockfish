@@ -38,7 +38,7 @@ namespace Stockfish::Eval::NNUE {
 using namespace SIMD;
 
 AccumulatorStack::AccumulatorStack(const Network& network) 
-    : featT(network.featureTransformer) {}
+    : ft(network.featureTransformer) {}
 
 namespace {
 
@@ -122,38 +122,36 @@ void AccumulatorStack::pop() noexcept {
 }
 
 void AccumulatorStack::evaluate(const Position&           pos,
-                                const FeatureTransformer& featureTransformer,
                                 // Silence spurious warning on GCC 10
                                 [[maybe_unused]] AccumulatorCaches& cache) noexcept {
-    evaluate_side<PSQFeatureSet>(WHITE, pos, featureTransformer, cache);
-    evaluate_side<PSQFeatureSet>(BLACK, pos, featureTransformer, cache);
+    evaluate_side<PSQFeatureSet>(WHITE, pos, cache);
+    evaluate_side<PSQFeatureSet>(BLACK, pos, cache);
 
-    evaluate_side<ThreatFeatureSet>(WHITE, pos, featureTransformer, cache);
-    evaluate_side<ThreatFeatureSet>(BLACK, pos, featureTransformer, cache);
+    evaluate_side<ThreatFeatureSet>(WHITE, pos, cache);
+    evaluate_side<ThreatFeatureSet>(BLACK, pos, cache);
 }
 
 template<typename FeatureSet>
 void AccumulatorStack::evaluate_side(Color                     perspective,
                                      const Position&           pos,
-                                     const FeatureTransformer& featureTransformer,
                                      AccumulatorCaches&        cache) noexcept {
 
     const auto last_usable_accum = find_last_usable_accumulator<FeatureSet>(perspective);
 
     if (accumulators<FeatureSet>()[last_usable_accum].computed[perspective])
-        forward_update_incremental<FeatureSet>(perspective, pos, featureTransformer,
+        forward_update_incremental<FeatureSet>(perspective, pos,
                                                last_usable_accum);
 
     else
     {
         if constexpr (std::is_same_v<FeatureSet, PSQFeatureSet>)
-            update_accumulator_refresh_cache(perspective, featureTransformer, pos,
+            update_accumulator_refresh_cache(perspective, ft, pos,
                                              mut_latest<PSQFeatureSet>(), cache);
         else
-            update_threats_accumulator_full(perspective, featureTransformer, pos,
+            update_threats_accumulator_full(perspective, ft, pos,
                                             mut_latest<ThreatFeatureSet>());
 
-        backward_update_incremental<FeatureSet>(perspective, pos, featureTransformer,
+        backward_update_incremental<FeatureSet>(perspective, pos,
                                                 last_usable_accum);
     }
 }
@@ -178,7 +176,6 @@ std::size_t AccumulatorStack::find_last_usable_accumulator(Color perspective) co
 template<typename FeatureSet>
 void AccumulatorStack::forward_update_incremental(Color                     perspective,
                                                   const Position&           pos,
-                                                  const FeatureTransformer& featureTransformer,
                                                   const std::size_t         begin) noexcept {
 
     assert(begin < accumulators<FeatureSet>().size());
@@ -188,7 +185,7 @@ void AccumulatorStack::forward_update_incremental(Color                     pers
 
     for (std::size_t next = begin + 1; next < size; next++)
     {
-        update_accumulator_incremental<true>(perspective, featureTransformer, ksq,
+        update_accumulator_incremental<true>(perspective, ft, ksq,
                                              mut_accumulators<FeatureSet>()[next],
                                              accumulators<FeatureSet>()[next - 1]);
     }
@@ -200,7 +197,6 @@ template<typename FeatureSet>
 void AccumulatorStack::backward_update_incremental(Color perspective,
 
                                                    const Position&           pos,
-                                                   const FeatureTransformer& featureTransformer,
                                                    const std::size_t         end) noexcept {
 
     assert(end < accumulators<FeatureSet>().size());
@@ -210,7 +206,7 @@ void AccumulatorStack::backward_update_incremental(Color perspective,
     const Square ksq = pos.square<KING>(perspective);
 
     for (std::int64_t next = std::int64_t(size) - 2; next >= std::int64_t(end); next--)
-        update_accumulator_incremental<false>(perspective, featureTransformer, ksq,
+        update_accumulator_incremental<false>(perspective, ft, ksq,
                                               mut_accumulators<FeatureSet>()[next],
                                               accumulators<FeatureSet>()[next + 1]);
 

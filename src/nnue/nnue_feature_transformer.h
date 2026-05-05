@@ -211,7 +211,8 @@ class FeatureTransformer {
                            int                bucket) const {
 
         using namespace SIMD;
-        accumulatorStack.evaluate(pos, *this, cache);
+        assert(&accumulatorStack.ft == this);
+        accumulatorStack.evaluate(pos, cache);
         const auto& accumulatorState       = accumulatorStack.latest<PSQFeatureSet>();
         const auto& threatAccumulatorState = accumulatorStack.latest<ThreatFeatureSet>();
 

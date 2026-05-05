@@ -118,12 +118,11 @@ class AccumulatorStack {
     void                                  pop() noexcept;
 
     void evaluate(const Position&           pos,
-                  const FeatureTransformer& featureTransformer,
                   // Silence spurious warning on GCC 10
                   [[maybe_unused]] AccumulatorCaches& cache) noexcept;
 
+    const FeatureTransformer& ft;
    private:
-    const FeatureTransformer& featT;
     template<typename T>
     [[nodiscard]] AccumulatorState<T>& mut_latest() noexcept;
 
@@ -136,7 +135,6 @@ class AccumulatorStack {
     template<typename FeatureSet>
     void evaluate_side(Color                     perspective,
                        const Position&           pos,
-                       const FeatureTransformer& featureTransformer,
                        // Silence spurious warning on GCC 10
                        [[maybe_unused]] AccumulatorCaches& cache) noexcept;
 
@@ -146,13 +144,11 @@ class AccumulatorStack {
     template<typename FeatureSet>
     void forward_update_incremental(Color                     perspective,
                                     const Position&           pos,
-                                    const FeatureTransformer& featureTransformer,
                                     const std::size_t         begin) noexcept;
 
     template<typename FeatureSet>
     void backward_update_incremental(Color                     perspective,
                                      const Position&           pos,
-                                     const FeatureTransformer& featureTransformer,
                                      const std::size_t         end) noexcept;
 
     std::array<AccumulatorState<PSQFeatureSet>, MaxSize>    psq_accumulators;
