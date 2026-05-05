@@ -42,10 +42,9 @@ AccumulatorStack::AccumulatorStack(const Network& network)
 
 namespace {
 
-template<typename FeatureSet>
-struct AccumulatorUpdateContext;
+template<typename FeatureSet> struct AccumulatorUpdateContext;
 
-Bitboard get_changed_pieces(const std::array<Piece, SQUARE_NB>& oldPieces,
+inline sf_always_inline Bitboard get_changed_pieces(const std::array<Piece, SQUARE_NB>& oldPieces,
                             const std::array<Piece, SQUARE_NB>& newPieces);
 
 }
@@ -555,10 +554,10 @@ struct AccumulatorUpdateContext {
     const AccumulatorState<FeatureSet>& from;
     AccumulatorState<FeatureSet>&       to;
 
-    AccumulatorUpdateContext(Color                               persp,
-                             const FeatureTransformer&           ft,
-                             const AccumulatorState<FeatureSet>& accF,
-                             AccumulatorState<FeatureSet>&       accT) noexcept :
+    inline AccumulatorUpdateContext(Color                               persp,
+                                    const FeatureTransformer&           ft,
+                                    const AccumulatorState<FeatureSet>& accF,
+                                    AccumulatorState<FeatureSet>&       accT) noexcept :
         perspective{persp},
         featureTransformer{ft},
         from{accF},
@@ -567,7 +566,7 @@ struct AccumulatorUpdateContext {
     template<UpdateOperation... ops,
              typename... Ts,
              std::enable_if_t<is_all_same_v<IndexType, Ts...>, bool> = true>
-    void apply(const Ts... indices) {
+    sf_always_inline void apply(const Ts... indices) {
         constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
 
         auto to_weight_vector = [&](const IndexType index) {
@@ -587,7 +586,7 @@ struct AccumulatorUpdateContext {
           to_psqt_weight_vector(indices)...);
     }
 
-    void apply(const typename FeatureSet::IndexList& added,
+    sf_always_inline inline void apply(const typename FeatureSet::IndexList& added,
                const typename FeatureSet::IndexList& removed) {
         constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
 
