@@ -151,6 +151,21 @@ class AccumulatorStack {
                                      const Position&           pos,
                                      const std::size_t         end) noexcept;
 
+    template<bool Forward, typename FeatureSet>
+    void update_accumulator_incremental(Color                               perspective,
+                                        const Square                        ksq,
+                                        AccumulatorState<FeatureSet>&       target_state,
+                                        const AccumulatorState<FeatureSet>& computed);
+
+    void update_accumulator_refresh_cache(Color                            perspective,
+                                          const Position&                  pos,
+                                          AccumulatorState<PSQFeatureSet>& accumulatorState,
+                                          AccumulatorCaches&               cache);
+
+    void update_threats_accumulator_full(Color                               perspective,
+                                         const Position&                     pos,
+                                         AccumulatorState<ThreatFeatureSet>& accumulatorState);
+
     std::array<AccumulatorState<PSQFeatureSet>, MaxSize>    psq_accumulators;
     std::array<AccumulatorState<ThreatFeatureSet>, MaxSize> threat_accumulators;
     std::size_t                                             size = 1;
