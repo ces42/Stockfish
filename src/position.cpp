@@ -1175,6 +1175,7 @@ void write_multiple_dirties(const Position& p,
 
     const __m512i template_v = _mm512_set1_epi32(dt_template.raw());
     auto*         write      = dts->list.make_space(dt_count);
+    assert(write + 16 <= dts->list.begin() + decltype(dts->list)::MaximumSize);
 
     // Extract the list of squares and upconvert to 32 bits. There are never more than 16
     // incoming threats so this is sufficient.

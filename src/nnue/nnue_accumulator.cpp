@@ -32,7 +32,6 @@
 #include "nnue_common.h"
 #include "nnue_feature_transformer.h"  // IWYU pragma: keep
 #include "simd.h"
-// #define USE_AVX512ICL
 
 namespace Stockfish::Eval::NNUE {
 
@@ -211,7 +210,7 @@ void AccumulatorStack::update_accumulator_incremental(Color                     
     if constexpr (std::is_same_v<FeatureSet, ThreatFeatureSet>)
     {
         const auto* pfBase   = &ft.threatWeights[0];
-        IndexType   pfStride = FeatureTransformer::OutputDimensions;
+        IndexType   pfStride = L1;
         if constexpr (Forward)
             FeatureSet::append_changed_indices(perspective, ksq, target_state.diff, removed, added,
                                                nullptr, false, pfBase, pfStride);
@@ -280,7 +279,7 @@ void AccumulatorStack::update_accumulator_refresh_cache(Color                   
                                                         const Position&                  pos,
                                                         AccumulatorState<PSQFeatureSet>& accumulator,
                                                         AccumulatorCaches&               cache) {
-    constexpr auto Dimensions = FeatureTransformer::OutputDimensions;
+    constexpr auto Dimensions = L1;
 
     using Tiling [[maybe_unused]] = SIMDTiling<Dimensions, Dimensions, PSQTBuckets>;
 
@@ -423,7 +422,7 @@ void AccumulatorStack::update_accumulator_refresh_cache(Color                   
 void AccumulatorStack::update_threats_accumulator_full(Color                               perspective,
                                                        const Position&                     pos,
                                                        AccumulatorState<ThreatFeatureSet>& accumulator) {
-    constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
+    constexpr IndexType Dimensions = L1;
     using Tiling [[maybe_unused]]  = SIMDTiling<Dimensions, Dimensions, PSQTBuckets>;
 
     ThreatFeatureSet::IndexList active;
@@ -709,7 +708,7 @@ struct AccumulatorUpdateContext {
              typename... Ts,
              std::enable_if_t<is_all_same_v<IndexType, Ts...>, bool> = true>
     sf_always_inline inline void apply(const Ts... indices) {
-        constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
+        constexpr IndexType Dimensions = L1;
 
         auto to_weight_vector = [&](const IndexType index) {
             return &featureTransformer.weights[index * Dimensions];
@@ -730,7 +729,7 @@ struct AccumulatorUpdateContext {
 
     sf_always_inline inline void apply(const typename FeatureSet::IndexList& added,
                const typename FeatureSet::IndexList& removed) {
-        constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
+        constexpr IndexType Dimensions = L1;
 
         const auto& fromAcc = from.accumulation[perspective];
         auto&       toAcc   = to.accumulation[perspective];

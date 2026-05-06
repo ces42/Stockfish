@@ -76,17 +76,13 @@ void permute(std::array<T, N>& data, const std::array<std::size_t, OrderSize>& o
 
 // Input feature converter
 class FeatureTransformer {
-    // Number of output dimensions for one side
-    static constexpr IndexType HalfDimensions = L1;
-
    public:
     // Number of input/output dimensions
     static constexpr IndexType InputDimensions =
       PSQFeatureSet::Dimensions + ThreatFeatureSet::Dimensions;
-    static constexpr IndexType OutputDimensions = HalfDimensions;
 
     // Size of forward propagation buffer
-    static constexpr std::size_t BufferSize = OutputDimensions * sizeof(TransformedFeatureType);
+    static constexpr std::size_t BufferSize = L1 * sizeof(TransformedFeatureType);
 
     // Store the order by which 128-bit blocks of a 1024-bit data must
     // be permuted so that calling packus on adjacent vectors of 16-bit
@@ -124,7 +120,7 @@ class FeatureTransformer {
     // Hash value embedded in the evaluation file
     static constexpr std::uint32_t get_hash_value() {
         return combine_hash({ThreatFeatureSet::HashValue, PSQFeatureSet::HashValue})
-             ^ (OutputDimensions * 2);
+             ^ (L1 * 2);
     }
 
     void permute_weights() {
@@ -145,7 +141,7 @@ class FeatureTransformer {
         read_leb_128(stream, biases);
 
         read_little_endian<ThreatWeightType>(stream, threatWeights.data(),
-                                             ThreatFeatureSet::Dimensions * HalfDimensions);
+                                             ThreatFeatureSet::Dimensions * L1);
         read_leb_128(stream, weights);
         read_leb_128(stream, threatPsqtWeights, psqtWeights);
 
@@ -163,7 +159,7 @@ class FeatureTransformer {
         write_leb_128<BiasType>(stream, copy->biases);
 
         write_little_endian<ThreatWeightType>(stream, copy->threatWeights.data(),
-                                              ThreatFeatureSet::Dimensions * HalfDimensions);
+                                              ThreatFeatureSet::Dimensions * L1);
         write_leb_128<WeightType>(stream, copy->weights);
 
         auto combinedPsqtWeights =
@@ -197,11 +193,11 @@ class FeatureTransformer {
         return h;
     }
 
-    alignas(CacheLineSize) std::array<BiasType, HalfDimensions> biases;
+    alignas(CacheLineSize) std::array<BiasType, L1> biases;
     alignas(
-      CacheLineSize) std::array<WeightType, HalfDimensions * PSQFeatureSet::Dimensions> weights;
+      CacheLineSize) std::array<WeightType, L1 * PSQFeatureSet::Dimensions> weights;
     alignas(CacheLineSize)
-      std::array<ThreatWeightType, HalfDimensions * ThreatFeatureSet::Dimensions> threatWeights;
+      std::array<ThreatWeightType, L1 * ThreatFeatureSet::Dimensions> threatWeights;
     alignas(CacheLineSize)
       std::array<PSQTWeightType, PSQFeatureSet::Dimensions * PSQTBuckets> psqtWeights;
     alignas(CacheLineSize)

@@ -195,6 +195,7 @@ template<typename T, std::size_t MaxSize>
 class ValueList {
 
    public:
+    static const size_t MaximumSize = MaxSize;
     std::size_t size() const { return size_; }
     int         ssize() const { return int(size_); }
     void        push_back(const T& value) {
