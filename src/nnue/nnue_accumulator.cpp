@@ -32,6 +32,7 @@
 #include "nnue_common.h"
 #include "nnue_feature_transformer.h"  // IWYU pragma: keep
 #include "simd.h"
+// #define USE_AVX512ICL
 
 namespace Stockfish::Eval::NNUE {
 
@@ -397,19 +398,19 @@ void AccumulatorStack::update_accumulator_refresh_cache(Color                   
     {
         const IndexType offset = Dimensions * index;
         for (IndexType j = 0; j < Dimensions; ++j)
-            entry.accumulation[j] -= featureTransformer.weights[offset + j];
+            entry.accumulation[j] -= ft.weights[offset + j];
 
         for (std::size_t k = 0; k < PSQTBuckets; ++k)
-            entry.psqtAccumulation[k] -= featureTransformer.psqtWeights[index * PSQTBuckets + k];
+            entry.psqtAccumulation[k] -= ft.psqtWeights[index * PSQTBuckets + k];
     }
     for (const auto index : added)
     {
         const IndexType offset = Dimensions * index;
         for (IndexType j = 0; j < Dimensions; ++j)
-            entry.accumulation[j] += featureTransformer.weights[offset + j];
+            entry.accumulation[j] += ft.weights[offset + j];
 
         for (std::size_t k = 0; k < PSQTBuckets; ++k)
-            entry.psqtAccumulation[k] += featureTransformer.psqtWeights[index * PSQTBuckets + k];
+            entry.psqtAccumulation[k] += ft.psqtWeights[index * PSQTBuckets + k];
     }
 
     // The accumulator of the refresh entry has been updated.
@@ -507,11 +508,11 @@ void AccumulatorStack::update_threats_accumulator_full(Color                    
 
         for (IndexType j = 0; j < Dimensions; ++j)
             accumulator.accumulation[perspective][j] +=
-              featureTransformer.threatWeights[offset + j];
+              ft.threatWeights[offset + j];
 
         for (std::size_t k = 0; k < PSQTBuckets; ++k)
             accumulator.psqtAccumulation[perspective][k] +=
-              featureTransformer.threatPsqtWeights[index * PSQTBuckets + k];
+              ft.threatPsqtWeights[index * PSQTBuckets + k];
     }
 
 #endif
@@ -660,7 +661,7 @@ std::int32_t AccumulatorStack::transform(const Position&    pos,
             sum0 = std::clamp<BiasType>(sum0, 0, 255);
             sum1 = std::clamp<BiasType>(sum1, 0, 255);
 
-            output[offset + j] = static_cast<OutputType>(unsigned(sum0 * sum1) / 512);
+            output[offset + j] = static_cast<TransformedFeatureType>(unsigned(sum0 * sum1) / 512);
         }
 
 #endif
