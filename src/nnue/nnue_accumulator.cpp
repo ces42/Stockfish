@@ -37,14 +37,11 @@ namespace Stockfish::Eval::NNUE {
 
 using namespace SIMD;
 
-AccumulatorStack::AccumulatorStack(const Network& network) 
-    : ft(network.featureTransformer) {}
-
 namespace {
 
 template<typename FeatureSet> struct AccumulatorUpdateContext;
 
-inline sf_always_inline Bitboard get_changed_pieces(const std::array<Piece, SQUARE_NB>& oldPieces,
+inline Bitboard get_changed_pieces(const std::array<Piece, SQUARE_NB>& oldPieces,
                             const std::array<Piece, SQUARE_NB>& newPieces);
 
 }
@@ -57,6 +54,9 @@ const AccumulatorState<T>& AccumulatorStack::latest() const noexcept {
 // Explicit template instantiations
 template const AccumulatorState<PSQFeatureSet>&    AccumulatorStack::latest() const noexcept;
 template const AccumulatorState<ThreatFeatureSet>& AccumulatorStack::latest() const noexcept;
+
+AccumulatorStack::AccumulatorStack(const Network& network)
+    : ft(network.featureTransformer) {}
 
 template<typename T>
 AccumulatorState<T>& AccumulatorStack::mut_latest() noexcept {
@@ -107,16 +107,6 @@ std::pair<DirtyPiece&, DirtyThreats&> AccumulatorStack::push() noexcept {
 void AccumulatorStack::pop() noexcept {
     assert(size > 1);
     size--;
-}
-
-void AccumulatorStack::evaluate(const Position&           pos,
-                                // Silence spurious warning on GCC 10
-                                [[maybe_unused]] AccumulatorCaches& cache) noexcept {
-    evaluate_side<PSQFeatureSet>(WHITE, pos, cache);
-    evaluate_side<PSQFeatureSet>(BLACK, pos, cache);
-
-    evaluate_side<ThreatFeatureSet>(WHITE, pos, cache);
-    evaluate_side<ThreatFeatureSet>(BLACK, pos, cache);
 }
 
 template<typename FeatureSet>
@@ -527,15 +517,18 @@ void AccumulatorStack::update_threats_accumulator_full(Color                    
 #endif
 }
 
-
-
 // Convert input features
 std::int32_t AccumulatorStack::transform(const Position&    pos,
                                          AccumulatorCaches& cache,
                                          TransformedFeatureType*        output,
                                          int                bucket) {
 
-    evaluate(pos, cache);
+    evaluate_side<PSQFeatureSet>(WHITE, pos, cache);
+    evaluate_side<PSQFeatureSet>(BLACK, pos, cache);
+
+    evaluate_side<ThreatFeatureSet>(WHITE, pos, cache);
+    evaluate_side<ThreatFeatureSet>(BLACK, pos, cache);
+
     const auto& accumulatorState       = latest<PSQFeatureSet>();
     const auto& threatAccumulatorState = latest<ThreatFeatureSet>();
 
@@ -702,10 +695,10 @@ struct AccumulatorUpdateContext {
     const AccumulatorState<FeatureSet>& from;
     AccumulatorState<FeatureSet>&       to;
 
-    inline AccumulatorUpdateContext(Color                               persp,
-                                    const FeatureTransformer&           ft,
-                                    const AccumulatorState<FeatureSet>& accF,
-                                    AccumulatorState<FeatureSet>&       accT) noexcept :
+    AccumulatorUpdateContext(Color                               persp,
+                             const FeatureTransformer&           ft,
+                             const AccumulatorState<FeatureSet>& accF,
+                             AccumulatorState<FeatureSet>&       accT) noexcept :
         perspective{persp},
         featureTransformer{ft},
         from{accF},
@@ -714,7 +707,7 @@ struct AccumulatorUpdateContext {
     template<UpdateOperation... ops,
              typename... Ts,
              std::enable_if_t<is_all_same_v<IndexType, Ts...>, bool> = true>
-    sf_always_inline void apply(const Ts... indices) {
+    sf_always_inline inline void apply(const Ts... indices) {
         constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
 
         auto to_weight_vector = [&](const IndexType index) {

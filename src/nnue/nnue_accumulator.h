@@ -125,10 +125,6 @@ class AccumulatorStack {
    private:
     const FeatureTransformer& ft;
 
-    void evaluate(const Position&           pos,
-                  // Silence spurious warning on GCC 10
-                  [[maybe_unused]] AccumulatorCaches& cache) noexcept;
-
     template<typename T>
     [[nodiscard]] AccumulatorState<T>& mut_latest() noexcept;
 
