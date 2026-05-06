@@ -38,16 +38,7 @@ class Position;
 
 namespace Stockfish::Eval::NNUE {
 
-struct alignas(CacheLineSize) Accumulator;
-
 class Network;
-
-// Class that holds the result of affine transformation of input features
-struct alignas(CacheLineSize) Accumulator {
-    std::array<std::array<std::int16_t, L1>, COLOR_NB>          accumulation;
-    std::array<std::array<std::int32_t, PSQTBuckets>, COLOR_NB> psqtAccumulation;
-    std::array<bool, COLOR_NB>                                  computed = {};
-};
 
 
 // AccumulatorCaches struct provides per-thread accumulator caches, where each
@@ -90,8 +81,13 @@ struct AccumulatorCaches {
 };
 
 
+// Struct that holds the result of affine transformation of input features
 template<typename FeatureSet>
-struct AccumulatorState: public Accumulator {
+struct alignas(CacheLineSize) AccumulatorState {
+    std::array<std::array<std::int16_t, L1>, COLOR_NB>          accumulation;
+    std::array<std::array<std::int32_t, PSQTBuckets>, COLOR_NB> psqtAccumulation;
+    std::array<bool, COLOR_NB>                                  computed = {};
+
     typename FeatureSet::DiffType diff;
 
     void reset(const typename FeatureSet::DiffType& dp) noexcept {
