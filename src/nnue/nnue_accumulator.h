@@ -95,7 +95,7 @@ struct alignas(CacheLineSize) AccumulatorState {
         computed.fill(false);
     }
 
-    typename FeatureSet::DiffType& reset() noexcept {
+    [[nodiscard]] typename FeatureSet::DiffType& reset() noexcept {
         computed.fill(false);
         return diff;
     }

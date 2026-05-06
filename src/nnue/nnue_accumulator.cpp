@@ -537,10 +537,9 @@ std::int32_t AccumulatorStack::transform(const Position&    pos,
     auto        psqt =
       (psqtAccumulation[perspectives[0]][bucket] - psqtAccumulation[perspectives[1]][bucket]);
 
-    const auto& threatPsqtAccumulation = threatAccumulatorState.psqtAccumulation;
-    psqt                               = (psqt + threatPsqtAccumulation[perspectives[0]][bucket]
-            - threatPsqtAccumulation[perspectives[1]][bucket])
-         / 2;
+    const auto& threatPsqtAcc = threatAccumulatorState.psqtAccumulation;
+    psqt += threatPsqtAcc[perspectives[0]][bucket] - threatPsqtAcc[perspectives[1]][bucket];
+    psqt /= 2;
 
     const auto& accumulation       = accumulatorState.accumulation;
     const auto& threatAccumulation = threatAccumulatorState.accumulation;
@@ -562,6 +561,11 @@ std::int32_t AccumulatorStack::transform(const Position&    pos,
         const vec_t* in1 =
           reinterpret_cast<const vec_t*>(&(accumulation[perspectives[p]][L1 / 2]));
         vec_t* out = reinterpret_cast<vec_t*>(output + offset);
+
+        const vec_t* tin0 =
+          reinterpret_cast<const vec_t*>(&(threatAccumulation[perspectives[p]][0]));
+        const vec_t* tin1 = reinterpret_cast<const vec_t*>(
+          &(threatAccumulation[perspectives[p]][L1 / 2]));
 
         // Per the NNUE architecture, here we want to multiply pairs of
         // clipped elements and divide the product by 128. To do this,
@@ -623,10 +627,6 @@ std::int32_t AccumulatorStack::transform(const Position&    pos,
           6;
 #endif
 
-        const vec_t* tin0 =
-          reinterpret_cast<const vec_t*>(&(threatAccumulation[perspectives[p]][0]));
-        const vec_t* tin1 = reinterpret_cast<const vec_t*>(
-          &(threatAccumulation[perspectives[p]][L1 / 2]));
         for (IndexType j = 0; j < NumOutputChunks; ++j)
         {
             const vec_t acc0a = vec_add_16(in0[j * 2 + 0], tin0[j * 2 + 0]);
