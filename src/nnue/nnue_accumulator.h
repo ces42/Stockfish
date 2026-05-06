@@ -30,6 +30,7 @@
 #include "../types.h"
 #include "nnue_architecture.h"
 #include "nnue_common.h"
+#include "nnue_feature_transformer.h"
 
 namespace Stockfish {
 class Position;
@@ -40,7 +41,6 @@ namespace Stockfish::Eval::NNUE {
 struct alignas(CacheLineSize) Accumulator;
 
 class Network;
-class FeatureTransformer;
 
 // Class that holds the result of affine transformation of input features
 struct alignas(CacheLineSize) Accumulator {
@@ -117,12 +117,18 @@ class AccumulatorStack {
     std::pair<DirtyPiece&, DirtyThreats&> push() noexcept;
     void                                  pop() noexcept;
 
+    std::int32_t transform(const Position&    pos,
+                           AccumulatorCaches& cache,
+                           TransformedFeatureType*        output,
+                           int                bucket);
+
+   private:
+    const FeatureTransformer& ft;
+
     void evaluate(const Position&           pos,
                   // Silence spurious warning on GCC 10
                   [[maybe_unused]] AccumulatorCaches& cache) noexcept;
 
-    const FeatureTransformer& ft;
-   private:
     template<typename T>
     [[nodiscard]] AccumulatorState<T>& mut_latest() noexcept;
 
