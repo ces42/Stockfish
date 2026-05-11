@@ -80,13 +80,15 @@ struct AccumulatorCaches {
     std::array<std::array<Entry, COLOR_NB>, SQUARE_NB> entries;
 };
 
-
 // Struct that holds the result of affine transformation of input features
-template<typename FeatureSet>
-struct alignas(CacheLineSize) AccumulatorState {
+struct alignas(CacheLineSize) Accumulator {
     std::array<std::array<std::int16_t, L1>, COLOR_NB>          accumulation;
     std::array<std::array<std::int32_t, PSQTBuckets>, COLOR_NB> psqtAccumulation;
     std::array<bool, COLOR_NB>                                  computed = {};
+};
+
+template<typename FeatureSet>
+struct AccumulatorState : public Accumulator {
 
     typename FeatureSet::DiffType diff;
 
