@@ -707,7 +707,7 @@ struct AccumulatorUpdateContext {
     template<UpdateOperation... ops,
              typename... Ts,
              std::enable_if_t<is_all_same_v<IndexType, Ts...>, bool> = true>
-    sf_always_inline inline void apply(const Ts... indices) {
+    inline void apply(const Ts... indices) {
         constexpr IndexType Dimensions = L1;
 
         auto to_weight_vector = [&](const IndexType index) {
@@ -727,7 +727,7 @@ struct AccumulatorUpdateContext {
           to_psqt_weight_vector(indices)...);
     }
 
-    sf_always_inline inline void apply(const typename FeatureSet::IndexList& added,
+    inline void apply(const typename FeatureSet::IndexList& added,
                const typename FeatureSet::IndexList& removed) {
         constexpr IndexType Dimensions = L1;
 
