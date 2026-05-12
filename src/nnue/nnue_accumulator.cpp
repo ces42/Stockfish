@@ -117,7 +117,7 @@ void AccumulatorStack::pop() noexcept {
 }
 
 template<typename FeatureSet>
-void AccumulatorStack::evaluate_side(Color                     perspective,
+__attribute__((noinline)) void AccumulatorStack::evaluate_side(Color                     perspective,
                                      const Position&           pos) noexcept {
 
     const auto last_usable_accum = find_last_usable_accumulator<FeatureSet>(perspective);
