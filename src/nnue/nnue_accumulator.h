@@ -112,6 +112,7 @@ class AccumulatorStack {
     [[nodiscard]] const AccumulatorState<T>& latest() const noexcept;
 
     void                                  reset() noexcept;
+    void                                  set_network(const Network&) noexcept;
     std::pair<DirtyPiece&, DirtyThreats&> push() noexcept;
     void                                  pop() noexcept;
 
@@ -121,7 +122,7 @@ class AccumulatorStack {
                            int                bucket);
 
    private:
-    const FeatureTransformer& ft;
+    const FeatureTransformer* ft;
 
     template<typename T>
     [[nodiscard]] AccumulatorState<T>& mut_latest() noexcept;

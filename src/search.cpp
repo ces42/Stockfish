@@ -642,6 +642,7 @@ void Search::Worker::clear() {
         reductions[i] = int(2834 / 128.0 * std::log(i));
 
     refreshTable.clear(network[numaAccessToken]);
+    accumulatorStack.set_network(network[numaAccessToken]);
 }
 
 

@@ -56,7 +56,7 @@ template const AccumulatorState<PSQFeatureSet>&    AccumulatorStack::latest() co
 template const AccumulatorState<ThreatFeatureSet>& AccumulatorStack::latest() const noexcept;
 
 AccumulatorStack::AccumulatorStack(const Network& network)
-    : ft(network.featureTransformer) {}
+    : ft(&network.featureTransformer) {}
 
 template<typename T>
 AccumulatorState<T>& AccumulatorStack::mut_latest() noexcept {
@@ -93,6 +93,11 @@ void AccumulatorStack::reset() noexcept {
     psq_accumulators[0].reset({});
     threat_accumulators[0].reset({});
     size = 1;
+}
+
+void AccumulatorStack::set_network(const Network& network) noexcept {
+    ft = &network.featureTransformer;
+    reset();
 }
 
 std::pair<DirtyPiece&, DirtyThreats&> AccumulatorStack::push() noexcept {
@@ -209,7 +214,7 @@ void AccumulatorStack::update_accumulator_incremental(Color                     
     typename FeatureSet::IndexList removed, added;
     if constexpr (std::is_same_v<FeatureSet, ThreatFeatureSet>)
     {
-        const auto* pfBase   = &ft.threatWeights[0];
+        const auto* pfBase   = &ft->threatWeights[0];
         IndexType   pfStride = L1;
         if constexpr (Forward)
             FeatureSet::append_changed_indices(perspective, ksq, target_state.diff, removed, added,
@@ -226,7 +231,7 @@ void AccumulatorStack::update_accumulator_incremental(Color                     
             FeatureSet::append_changed_indices(perspective, ksq, computed.diff, added, removed);
     }
 
-    AccumulatorUpdateContext<FeatureSet> updateContext{perspective, ft, computed, target_state};
+    AccumulatorUpdateContext<FeatureSet> updateContext{perspective, *ft, computed, target_state};
 
     if constexpr (std::is_same_v<FeatureSet, ThreatFeatureSet>)
         updateContext.apply(added, removed);
@@ -316,7 +321,7 @@ void AccumulatorStack::update_accumulator_refresh_cache(Color                   
     vec_t      acc[Tiling::NumRegs];
     psqt_vec_t psqt[Tiling::NumPsqtRegs];
 
-    const auto* weights = &ft.weights[0];
+    const auto* weights = &ft->weights[0];
 
     for (IndexType j = 0; j < Dimensions / Tiling::TileHeight; ++j)
     {
@@ -369,7 +374,7 @@ void AccumulatorStack::update_accumulator_refresh_cache(Color                   
             size_t       index  = removed[i];
             const size_t offset = PSQTBuckets * index + j * Tiling::PsqtTileHeight;
             auto*        columnPsqt =
-              reinterpret_cast<const psqt_vec_t*>(&ft.psqtWeights[offset]);
+              reinterpret_cast<const psqt_vec_t*>(&ft->psqtWeights[offset]);
 
             for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
                 psqt[k] = vec_sub_psqt_32(psqt[k], columnPsqt[k]);
@@ -379,7 +384,7 @@ void AccumulatorStack::update_accumulator_refresh_cache(Color                   
             size_t       index  = added[i];
             const size_t offset = PSQTBuckets * index + j * Tiling::PsqtTileHeight;
             auto*        columnPsqt =
-              reinterpret_cast<const psqt_vec_t*>(&ft.psqtWeights[offset]);
+              reinterpret_cast<const psqt_vec_t*>(&ft->psqtWeights[offset]);
 
             for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
                 psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
@@ -397,19 +402,19 @@ void AccumulatorStack::update_accumulator_refresh_cache(Color                   
     {
         const IndexType offset = Dimensions * index;
         for (IndexType j = 0; j < Dimensions; ++j)
-            entry.accumulation[j] -= ft.weights[offset + j];
+            entry.accumulation[j] -= ft->weights[offset + j];
 
         for (std::size_t k = 0; k < PSQTBuckets; ++k)
-            entry.psqtAccumulation[k] -= ft.psqtWeights[index * PSQTBuckets + k];
+            entry.psqtAccumulation[k] -= ft->psqtWeights[index * PSQTBuckets + k];
     }
     for (const auto index : added)
     {
         const IndexType offset = Dimensions * index;
         for (IndexType j = 0; j < Dimensions; ++j)
-            entry.accumulation[j] += ft.weights[offset + j];
+            entry.accumulation[j] += ft->weights[offset + j];
 
         for (std::size_t k = 0; k < PSQTBuckets; ++k)
-            entry.psqtAccumulation[k] += ft.psqtWeights[index * PSQTBuckets + k];
+            entry.psqtAccumulation[k] += ft->psqtWeights[index * PSQTBuckets + k];
     }
 
     // The accumulator of the refresh entry has been updated.
@@ -434,7 +439,7 @@ void AccumulatorStack::update_threats_accumulator_full(Color                    
     vec_t      acc[Tiling::NumRegs];
     psqt_vec_t psqt[Tiling::NumPsqtRegs];
 
-    const auto* threatWeights = &ft.threatWeights[0];
+    const auto* threatWeights = &ft->threatWeights[0];
 
     for (IndexType j = 0; j < Dimensions / Tiling::TileHeight; ++j)
     {
@@ -483,7 +488,7 @@ void AccumulatorStack::update_threats_accumulator_full(Color                    
             size_t       index  = active[i];
             const size_t offset = PSQTBuckets * index + j * Tiling::PsqtTileHeight;
             auto*        columnPsqt =
-              reinterpret_cast<const psqt_vec_t*>(&ft.threatPsqtWeights[offset]);
+              reinterpret_cast<const psqt_vec_t*>(&ft->threatPsqtWeights[offset]);
 
             for (std::size_t k = 0; k < Tiling::NumPsqtRegs; ++k)
                 psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
@@ -507,11 +512,11 @@ void AccumulatorStack::update_threats_accumulator_full(Color                    
 
         for (IndexType j = 0; j < Dimensions; ++j)
             accumulator.accumulation[perspective][j] +=
-              ft.threatWeights[offset + j];
+              ft->threatWeights[offset + j];
 
         for (std::size_t k = 0; k < PSQTBuckets; ++k)
             accumulator.psqtAccumulation[perspective][k] +=
-              ft.threatPsqtWeights[index * PSQTBuckets + k];
+              ft->threatPsqtWeights[index * PSQTBuckets + k];
     }
 
 #endif
@@ -595,13 +600,13 @@ std::int32_t AccumulatorStack::transform(const Position&    pos,
         // which is the same as performing a rightward shift of 16 bits.
         // We can use this to our advantage. Recall that we want to
         // divide the final product by 128, which is equivalent to a
-        // 7-bit right shift. Intuitively, if we shift the clipped
+        // 7-bit right shift-> Intuitively, if we shift the clipped
         // value left by 9, and perform mulhi, which shifts the product
         // right by 16 bits, then we will net a right shift of 7 bits.
         // However, this won't work as intended. Since we clip the
         // values to have a maximum value of 127, shifting it by 9 bits
         // might occupy the signed bit, resulting in some positive
-        // values being interpreted as negative after the shift.
+        // values being interpreted as negative after the shift->
 
         // There is a way, however, to get around this limitation. When
         // loading the network, scale accumulator weights and biases by
@@ -609,7 +614,7 @@ std::int32_t AccumulatorStack::transform(const Position&    pos,
         // we need to divide the product by 128 * 2 * 2 = 512, which
         // amounts to a right shift of 9 bits. So now we only have to
         // shift left by 7 bits, perform mulhi (shifts right by 16 bits)
-        // and net a 9 bit right shift. Since we scaled everything by
+        // and net a 9 bit right shift-> Since we scaled everything by
         // two, the values are clipped at 127 * 2 = 254, which occupies
         // 8 bits. Shifting it by 7 bits left will no longer occupy the
         // signed bit, so we are safe.
