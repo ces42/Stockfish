@@ -117,12 +117,10 @@ class AccumulatorStack {
     void                                  pop() noexcept;
 
     std::int32_t transform(const Position&    pos,
-                           AccumulatorCaches& cache,
                            TransformedFeatureType*        output,
                            int                bucket);
 
    private:
-    const FeatureTransformer* ft;
 
     template<typename T>
     [[nodiscard]] AccumulatorState<T>& mut_latest() noexcept;
@@ -135,9 +133,7 @@ class AccumulatorStack {
 
     template<typename FeatureSet>
     void evaluate_side(Color                     perspective,
-                       const Position&           pos,
-                       // Silence spurious warning on GCC 10
-                       [[maybe_unused]] AccumulatorCaches& cache) noexcept;
+                       const Position&           pos) noexcept;
 
     template<typename FeatureSet>
     [[nodiscard]] std::size_t find_last_usable_accumulator(Color perspective) const noexcept;
@@ -160,8 +156,7 @@ class AccumulatorStack {
 
     void update_accumulator_refresh_cache(Color                            perspective,
                                           const Position&                  pos,
-                                          AccumulatorState<PSQFeatureSet>& accumulatorState,
-                                          AccumulatorCaches&               cache);
+                                          AccumulatorState<PSQFeatureSet>& accumulatorState);
 
     void update_threats_accumulator_full(Color                               perspective,
                                          const Position&                     pos,
@@ -169,7 +164,9 @@ class AccumulatorStack {
 
     std::array<AccumulatorState<PSQFeatureSet>, MaxSize>    psq_accumulators;
     std::array<AccumulatorState<ThreatFeatureSet>, MaxSize> threat_accumulators;
+    AccumulatorCaches                                       refreshTable;
     std::size_t                                             size = 1;
+    const FeatureTransformer*                               ft;
 };
 
 }  // namespace Stockfish::Eval::NNUE

@@ -146,8 +146,7 @@ bool Network::save(const std::optional<std::string>& filename) const {
 
 
 NetworkOutput Network::evaluate(const Position&    pos,
-                                AccumulatorStack&  accumulatorStack,
-                                AccumulatorCaches& cache) const {
+                                AccumulatorStack&  accumulatorStack) const {
 
     constexpr uint64_t alignment = CacheLineSize;
 
@@ -156,7 +155,7 @@ NetworkOutput Network::evaluate(const Position&    pos,
     ASSERT_ALIGNED(transformedFeatures, alignment);
 
     const int  bucket = (pos.count<ALL_PIECES>() - 1) / 4;
-    const auto psqt = accumulatorStack.transform(pos, cache, transformedFeatures, bucket);
+    const auto psqt = accumulatorStack.transform(pos, transformedFeatures, bucket);
     const auto positional = network[bucket].propagate(transformedFeatures);
     return {static_cast<Value>(psqt / OutputScale), static_cast<Value>(positional / OutputScale)};
 }
@@ -203,8 +202,7 @@ void Network::verify(std::string                                  evalfilePath,
 
 
 NnueEvalTrace Network::trace_evaluate(const Position&    pos,
-                                      AccumulatorStack&  accumulatorStack,
-                                      AccumulatorCaches& cache) const {
+                                      AccumulatorStack&  accumulatorStack) const {
 
     constexpr uint64_t alignment = CacheLineSize;
 
@@ -216,7 +214,7 @@ NnueEvalTrace Network::trace_evaluate(const Position&    pos,
     t.correctBucket = (pos.count<ALL_PIECES>() - 1) / 4;
     for (IndexType bucket = 0; bucket < LayerStacks; ++bucket)
     {
-        const auto materialist = accumulatorStack.transform(pos, cache, transformedFeatures, bucket);
+        const auto materialist = accumulatorStack.transform(pos, transformedFeatures, bucket);
         const auto positional = network[bucket].propagate(transformedFeatures);
 
         t.psqt[bucket]       = static_cast<Value>(materialist / OutputScale);

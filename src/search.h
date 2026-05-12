@@ -405,7 +405,6 @@ class Worker {
 
     // Used by NNUE
     Eval::NNUE::AccumulatorStack  accumulatorStack;
-    Eval::NNUE::AccumulatorCaches refreshTable;
 
     friend class Stockfish::ThreadPool;
     friend class SearchManager;

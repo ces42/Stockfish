@@ -41,7 +41,6 @@ class Position;
 namespace Stockfish::Eval::NNUE {
 
 class AccumulatorStack;
-struct AccumulatorCaches;
 
 using NetworkOutput = std::tuple<Value, Value>;
 
@@ -65,14 +64,12 @@ class Network {
     std::size_t get_content_hash() const;
 
     NetworkOutput evaluate(const Position&    pos,
-                           AccumulatorStack&  accumulatorStack,
-                           AccumulatorCaches& cache) const;
+                           AccumulatorStack&  accumulatorStack) const;
 
 
     void verify(std::string evalfilePath, const std::function<void(std::string_view)>&) const;
     NnueEvalTrace trace_evaluate(const Position&    pos,
-                                 AccumulatorStack&  accumulatorStack,
-                                 AccumulatorCaches& cache) const;
+                                 AccumulatorStack&  accumulatorStack) const;
 
    private:
     void load_user_net(const std::string&, const std::string&);

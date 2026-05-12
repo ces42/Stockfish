@@ -174,8 +174,7 @@ Search::Worker::Worker(SharedState&                    sharedState,
     threads(sharedState.threads),
     tt(sharedState.tt),
     network(sharedState.network),
-    accumulatorStack(network[token]),
-    refreshTable(network[token]) {
+    accumulatorStack(network[token]) {
     clear();
 }
 
@@ -641,7 +640,6 @@ void Search::Worker::clear() {
     for (size_t i = 1; i < reductions.size(); ++i)
         reductions[i] = int(2834 / 128.0 * std::log(i));
 
-    refreshTable.clear(network[numaAccessToken]);
     accumulatorStack.set_network(network[numaAccessToken]);
 }
 
@@ -1789,7 +1787,7 @@ TimePoint Search::Worker::elapsed() const {
 TimePoint Search::Worker::elapsed_time() const { return main_manager()->tm.elapsed_time(); }
 
 Value Search::Worker::evaluate(const Position& pos) {
-    return Eval::evaluate(network[numaAccessToken], pos, accumulatorStack, refreshTable,
+    return Eval::evaluate(network[numaAccessToken], pos, accumulatorStack,
                           optimism[pos.side_to_move()]);
 }
 

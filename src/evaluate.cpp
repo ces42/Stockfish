@@ -41,12 +41,11 @@ namespace Stockfish {
 Value Eval::evaluate(const Eval::NNUE::Network&     network,
                      const Position&                pos,
                      Eval::NNUE::AccumulatorStack&  accumulators,
-                     Eval::NNUE::AccumulatorCaches& caches,
                      int                            optimism) {
 
     assert(!pos.checkers());
 
-    auto [psqt, positional] = network.evaluate(pos, accumulators, caches);
+    auto [psqt, positional] = network.evaluate(pos, accumulators);
 
     Value nnue = (125 * psqt + 131 * positional) / 128;
 
@@ -77,7 +76,6 @@ std::string Eval::trace(Position& pos, const Eval::NNUE::Network& network) {
         return "Final evaluation: none (in check)";
 
     auto accumulators = std::make_unique<Eval::NNUE::AccumulatorStack>(network);
-    auto caches       = std::make_unique<Eval::NNUE::AccumulatorCaches>(network);
 
     std::stringstream ss;
     ss << std::showpoint << std::noshowpos << std::fixed << std::setprecision(2);

@@ -56,7 +56,8 @@ template const AccumulatorState<PSQFeatureSet>&    AccumulatorStack::latest() co
 template const AccumulatorState<ThreatFeatureSet>& AccumulatorStack::latest() const noexcept;
 
 AccumulatorStack::AccumulatorStack(const Network& network)
-    : ft(&network.featureTransformer) {}
+    : refreshTable(network),
+      ft(&network.featureTransformer) {}
 
 template<typename T>
 AccumulatorState<T>& AccumulatorStack::mut_latest() noexcept {
@@ -97,6 +98,7 @@ void AccumulatorStack::reset() noexcept {
 
 void AccumulatorStack::set_network(const Network& network) noexcept {
     ft = &network.featureTransformer;
+    refreshTable.clear(network);
     reset();
 }
 
@@ -116,8 +118,7 @@ void AccumulatorStack::pop() noexcept {
 
 template<typename FeatureSet>
 void AccumulatorStack::evaluate_side(Color                     perspective,
-                                     const Position&           pos,
-                                     AccumulatorCaches&        cache) noexcept {
+                                     const Position&           pos) noexcept {
 
     const auto last_usable_accum = find_last_usable_accumulator<FeatureSet>(perspective);
 
@@ -129,7 +130,7 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
     {
         if constexpr (std::is_same_v<FeatureSet, PSQFeatureSet>)
             update_accumulator_refresh_cache(perspective, pos,
-                                             mut_latest<PSQFeatureSet>(), cache);
+                                             mut_latest<PSQFeatureSet>());
         else
             update_threats_accumulator_full(perspective, pos,
                                             mut_latest<ThreatFeatureSet>());
@@ -282,14 +283,13 @@ void AccumulatorStack::update_accumulator_incremental(Color                     
 
 void AccumulatorStack::update_accumulator_refresh_cache(Color                            perspective,
                                                         const Position&                  pos,
-                                                        AccumulatorState<PSQFeatureSet>& accumulator,
-                                                        AccumulatorCaches&               cache) {
+                                                        AccumulatorState<PSQFeatureSet>& accumulator) {
     constexpr auto Dimensions = L1;
 
     using Tiling [[maybe_unused]] = SIMDTiling<Dimensions, Dimensions, PSQTBuckets>;
 
     const Square             ksq   = pos.square<KING>(perspective);
-    auto&                    entry = cache[ksq][perspective];
+    auto&                    entry = refreshTable[ksq][perspective];
     PSQFeatureSet::IndexList removed, added;
 
     const Bitboard changedBB = get_changed_pieces(entry.pieces, pos.piece_array());
@@ -524,15 +524,14 @@ void AccumulatorStack::update_threats_accumulator_full(Color                    
 
 // Convert input features
 std::int32_t AccumulatorStack::transform(const Position&    pos,
-                                         AccumulatorCaches& cache,
                                          TransformedFeatureType*        output,
                                          int                bucket) {
 
-    evaluate_side<PSQFeatureSet>(WHITE, pos, cache);
-    evaluate_side<PSQFeatureSet>(BLACK, pos, cache);
+    evaluate_side<PSQFeatureSet>(WHITE, pos);
+    evaluate_side<PSQFeatureSet>(BLACK, pos);
 
-    evaluate_side<ThreatFeatureSet>(WHITE, pos, cache);
-    evaluate_side<ThreatFeatureSet>(BLACK, pos, cache);
+    evaluate_side<ThreatFeatureSet>(WHITE, pos);
+    evaluate_side<ThreatFeatureSet>(BLACK, pos);
 
     const auto& accumulatorState       = latest<PSQFeatureSet>();
     const auto& threatAccumulatorState = latest<ThreatFeatureSet>();
