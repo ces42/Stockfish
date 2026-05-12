@@ -55,14 +55,14 @@ void format_cp_aligned_dot(Value v, std::stringstream& stream, const Position& p
 // Returns a string with the value of each piece on a board,
 // and a table for (PSQT, Layers) values bucket by bucket.
 std::string
-trace(Position& pos, const Eval::NNUE::Network& network, Eval::NNUE::AccumulatorCaches& caches) {
+trace(Position& pos, const Eval::NNUE::Network& network) {
 
     std::stringstream ss;
 
     auto accumulators = std::make_unique<AccumulatorStack>(network);
     accumulators->reset();
 
-    auto t = network.trace_evaluate(pos, *accumulators, caches);
+    auto t = network.trace_evaluate(pos, *accumulators);
 
     ss << "NNUE network contributions (Normalized, "
        << (pos.side_to_move() == WHITE ? "White to move)" : "Black to move)") << std::endl

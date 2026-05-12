@@ -53,9 +53,8 @@ struct NnueEvalTrace {
 };
 
 class Network;
-struct AccumulatorCaches;
 
-std::string trace(Position& pos, const Network& network, AccumulatorCaches& caches);
+std::string trace(Position& pos, const Network& network);
 
 }  // namespace Stockfish::Eval::NNUE
 }  // namespace Stockfish

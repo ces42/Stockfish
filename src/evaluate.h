@@ -37,7 +37,6 @@ namespace Eval {
 
 namespace NNUE {
 class Network;
-struct AccumulatorCaches;
 class AccumulatorStack;
 }
 

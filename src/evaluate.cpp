@@ -79,17 +79,17 @@ std::string Eval::trace(Position& pos, const Eval::NNUE::Network& network) {
 
     std::stringstream ss;
     ss << std::showpoint << std::noshowpos << std::fixed << std::setprecision(2);
-    ss << '\n' << NNUE::trace(pos, network, *caches) << '\n';
+    ss << '\n' << NNUE::trace(pos, network) << '\n';
 
     ss << std::showpoint << std::showpos << std::fixed << std::setprecision(2) << std::setw(15);
 
-    auto [psqt, positional] = network.evaluate(pos, *accumulators, *caches);
+    auto [psqt, positional] = network.evaluate(pos, *accumulators);
     Value v                 = psqt + positional;
     ss << "NNUE evaluation          " << v << " (side to move, internal units)\n";
     v = pos.side_to_move() == WHITE ? v : -v;
     ss << "NNUE evaluation        " << 0.01 * UCIEngine::to_cp(v, pos) << " (white side)\n";
 
-    v = evaluate(network, pos, *accumulators, *caches, VALUE_ZERO);
+    v = evaluate(network, pos, *accumulators, VALUE_ZERO);
     v = pos.side_to_move() == WHITE ? v : -v;
 
     ss << "Final evaluation      ";
