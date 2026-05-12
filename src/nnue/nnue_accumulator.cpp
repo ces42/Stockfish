@@ -30,7 +30,7 @@
 #include "network.h"
 #include "nnue_architecture.h"
 #include "nnue_common.h"
-#include "nnue_feature_transformer.h"  // IWYU pragma: keep
+#include "nnue_feature_transformer.h"
 #include "simd.h"
 
 namespace Stockfish::Eval::NNUE {
@@ -116,8 +116,8 @@ void AccumulatorStack::pop() noexcept {
     size--;
 }
 
-template<typename FeatureSet>
-__attribute__((noinline)) void AccumulatorStack::evaluate_side(Color                     perspective,
+template<typename FeatureSet> __attribute__((noinline))
+void AccumulatorStack::evaluate_side(Color                     perspective,
                                      const Position&           pos) noexcept {
 
     const auto last_usable_accum = find_last_usable_accumulator<FeatureSet>(perspective);

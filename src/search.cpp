@@ -39,7 +39,6 @@
 #include "misc.h"
 #include "movegen.h"
 #include "movepick.h"
-#include "nnue/network.h"
 #include "nnue/nnue_accumulator.h"
 #include "position.h"
 #include "syzygy/tbprobe.h"

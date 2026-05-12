@@ -30,7 +30,6 @@
 #include "../types.h"
 #include "nnue_architecture.h"
 #include "nnue_common.h"
-#include "nnue_feature_transformer.h"
 
 namespace Stockfish {
 class Position;
@@ -39,6 +38,7 @@ class Position;
 namespace Stockfish::Eval::NNUE {
 
 class Network;
+class FeatureTransformer;
 
 // AccumulatorCaches struct provides per-thread accumulator caches, where each
 // cache contains multiple entries for each of the possible king squares.
