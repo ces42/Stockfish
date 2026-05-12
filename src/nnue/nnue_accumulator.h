@@ -40,7 +40,6 @@ namespace Stockfish::Eval::NNUE {
 
 class Network;
 
-
 // AccumulatorCaches struct provides per-thread accumulator caches, where each
 // cache contains multiple entries for each of the possible king squares.
 // When the accumulator needs to be refreshed, the cached entry is used to more
@@ -81,14 +80,13 @@ struct AccumulatorCaches {
 };
 
 // Struct that holds the result of affine transformation of input features
-struct alignas(CacheLineSize) Accumulator {
+template<typename FeatureSet>
+struct AccumulatorState {
+    alignas(CacheLineSize)
     std::array<std::array<std::int16_t, L1>, COLOR_NB>          accumulation;
+    alignas(CacheLineSize)
     std::array<std::array<std::int32_t, PSQTBuckets>, COLOR_NB> psqtAccumulation;
     std::array<bool, COLOR_NB>                                  computed = {};
-};
-
-template<typename FeatureSet>
-struct AccumulatorState : public Accumulator {
 
     typename FeatureSet::DiffType diff;
 
