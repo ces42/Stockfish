@@ -134,22 +134,18 @@ class FeatureTransformer {
     }
 
     void permute_weights() {
-        permute<16>(biases, PackusEpi16Order);
         permute<16>(weights, PackusEpi16Order);
 
         permute<8>(threatWeights, PackusEpi16Order);
     }
 
     void unpermute_weights() {
-        permute<16>(biases, InversePackusEpi16Order);
         permute<16>(weights, InversePackusEpi16Order);
         permute<8>(threatWeights, InversePackusEpi16Order);
     }
 
     // Read network parameters
     bool read_parameters(std::istream& stream) {
-        read_leb_128(stream, biases);
-
         read_little_endian<ThreatWeightType>(stream, threatWeights.data(),
                                              ThreatInputDimensions * HalfDimensions);
         read_leb_128(stream, threatPsqtWeights);
@@ -168,9 +164,6 @@ class FeatureTransformer {
 
         copy->unpermute_weights();
 
-        write_leb_128<BiasType>(stream, copy->biases);
-
-
         write_little_endian<ThreatWeightType>(stream, copy->threatWeights.data(),
                                               ThreatInputDimensions * HalfDimensions);
         write_leb_128<PSQTWeightType>(stream, copy->threatPsqtWeights);
@@ -184,7 +177,6 @@ class FeatureTransformer {
     std::size_t get_content_hash() const {
         std::size_t h = 0;
 
-        hash_combine(h, get_raw_data_hash(biases));
         hash_combine(h, get_raw_data_hash(weights));
         hash_combine(h, get_raw_data_hash(psqtWeights));
 
@@ -282,8 +274,8 @@ class FeatureTransformer {
             // values being interpreted as negative after the shift.
 
             // There is a way, however, to get around this limitation. When
-            // loading the network, scale accumulator weights and biases by
-            // 2. To get the same pairwise multiplication result as before,
+            // loading the network, scale accumulator weights by 2.
+             // To get the same pairwise multiplication result as before,
             // we need to divide the product by 128 * 2 * 2 = 512, which
             // amounts to a right shift of 9 bits. So now we only have to
             // shift left by 7 bits, perform mulhi (shifts right by 16 bits)
@@ -343,16 +335,16 @@ class FeatureTransformer {
 
             for (IndexType j = 0; j < HalfDimensions / 2; ++j)
             {
-                BiasType sum0 = accumulation[static_cast<int>(perspectives[p])][j + 0];
-                BiasType sum1 =
+                AccumulatorType sum0 = accumulation[static_cast<int>(perspectives[p])][j + 0];
+                AccumulatorType sum1 =
                   accumulation[static_cast<int>(perspectives[p])][j + HalfDimensions / 2];
 
                 sum0 += threatAccumulation[static_cast<int>(perspectives[p])][j + 0];
                 sum1 +=
                   threatAccumulation[static_cast<int>(perspectives[p])][j + HalfDimensions / 2];
 
-                sum0 = std::clamp<BiasType>(sum0, 0, FtMaxVal);
-                sum1 = std::clamp<BiasType>(sum1, 0, FtMaxVal);
+                sum0 = std::clamp<AccumulatorType>(sum0, 0, FtMaxVal);
+                sum1 = std::clamp<AccumulatorType>(sum1, 0, FtMaxVal);
 
                 output[offset + j] = static_cast<OutputType>(unsigned(sum0 * sum1) / 512);
             }
@@ -363,7 +355,6 @@ class FeatureTransformer {
         return psqt;
     }  // end of function transform()
 
-    alignas(CacheLineSize) std::array<BiasType, HalfDimensions> biases;
     alignas(
       CacheLineSize) std::array<WeightType, HalfDimensions * PSQFeatureSet::Dimensions> weights;
     alignas(CacheLineSize)
