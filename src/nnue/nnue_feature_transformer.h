@@ -146,6 +146,8 @@ class FeatureTransformer {
 
     // Read network parameters
     bool read_parameters(std::istream& stream) {
+        biases.fill(0);
+
         read_little_endian<ThreatWeightType>(stream, threatWeights.data(),
                                              ThreatInputDimensions * HalfDimensions);
         read_leb_128(stream, threatPsqtWeights);
@@ -264,7 +266,7 @@ class FeatureTransformer {
             // mulhi cuts off the last 16 bits of the resulting product,
             // which is the same as performing a rightward shift of 16 bits.
             // We can use this to our advantage. Recall that we want to
-            // divide the final product by 128, which is equivalent to a
+            // divide the final prduct by 128, which is equivalent to a
             // 7-bit right shift. Intuitively, if we shift the clipped
             // value left by 9, and perform mulhi, which shifts the product
             // right by 16 bits, then we will net a right shift of 7 bits.
@@ -275,7 +277,7 @@ class FeatureTransformer {
 
             // There is a way, however, to get around this limitation. When
             // loading the network, scale accumulator weights by 2.
-             // To get the same pairwise multiplication result as before,
+            // To get the same pairwise multiplication result as before,
             // we need to divide the product by 128 * 2 * 2 = 512, which
             // amounts to a right shift of 9 bits. So now we only have to
             // shift left by 7 bits, perform mulhi (shifts right by 16 bits)
@@ -335,16 +337,16 @@ class FeatureTransformer {
 
             for (IndexType j = 0; j < HalfDimensions / 2; ++j)
             {
-                AccumulatorType sum0 = accumulation[static_cast<int>(perspectives[p])][j + 0];
-                AccumulatorType sum1 =
+                BiasType sum0 = accumulation[static_cast<int>(perspectives[p])][j + 0];
+                BiasType sum1 =
                   accumulation[static_cast<int>(perspectives[p])][j + HalfDimensions / 2];
 
                 sum0 += threatAccumulation[static_cast<int>(perspectives[p])][j + 0];
                 sum1 +=
                   threatAccumulation[static_cast<int>(perspectives[p])][j + HalfDimensions / 2];
 
-                sum0 = std::clamp<AccumulatorType>(sum0, 0, FtMaxVal);
-                sum1 = std::clamp<AccumulatorType>(sum1, 0, FtMaxVal);
+                sum0 = std::clamp<BiasType>(sum0, 0, FtMaxVal);
+                sum1 = std::clamp<BiasType>(sum1, 0, FtMaxVal);
 
                 output[offset + j] = static_cast<OutputType>(unsigned(sum0 * sum1) / 512);
             }
@@ -355,6 +357,7 @@ class FeatureTransformer {
         return psqt;
     }  // end of function transform()
 
+    alignas(CacheLineSize) std::array<BiasType, HalfDimensions> biases;
     alignas(
       CacheLineSize) std::array<WeightType, HalfDimensions * PSQFeatureSet::Dimensions> weights;
     alignas(CacheLineSize)

@@ -56,27 +56,31 @@ struct alignas(CacheLineSize) Accumulator {
 // This idea, was first described by Luecx (author of Koivisto) and
 // is commonly referred to as "Finny Tables".
 struct AccumulatorCaches {
-    AccumulatorCaches() {
-        clear();
+    template<typename Network>
+    AccumulatorCaches(const Network& network) {
+        clear(network);
     }
 
     struct alignas(CacheLineSize) Entry {
-        std::array<AccumulatorType, L1>         accumulation;
+        std::array<BiasType, L1>                accumulation;
         std::array<PSQTWeightType, PSQTBuckets> psqtAccumulation;
         std::array<Piece, SQUARE_NB>            pieces;
         Bitboard                                pieceBB;
 
         // To initialize a refresh entry, we set all its bitboards empty,
-        // and zero the accumulations
-        void clear() {
-            std::memset(reinterpret_cast<std::byte*>(this), 0, sizeof(Entry));
+        // so we put the biases in the accumulation, without any weights on top
+        void clear(const std::array<BiasType, L1>& biases) {
+            accumulation = biases;
+            std::memset(reinterpret_cast<std::byte*>(this) + offsetof(Entry, psqtAccumulation), 0,
+                        sizeof(Entry) - offsetof(Entry, psqtAccumulation));
         }
     };
 
-    void clear() {
+    template<typename Network>
+    void clear(const Network& network) {
         for (auto& entries1D : entries)
             for (auto& entry : entries1D)
-                entry.clear();
+                entry.clear(network.featureTransformer.biases);
     }
 
     std::array<Entry, COLOR_NB>& operator[](Square sq) { return entries[sq]; }

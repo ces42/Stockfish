@@ -388,7 +388,7 @@ struct Vec16Wrapper {
     static type add(const type& lhs, const type& rhs) { return vec_add_16(lhs, rhs); }
     static type sub(const type& lhs, const type& rhs) { return vec_sub_16(lhs, rhs); }
 #else
-    using type = AccumulatorType;
+    using type = BiasType;
     static type add(const type& lhs, const type& rhs) { return lhs + rhs; }
     static type sub(const type& lhs, const type& rhs) { return lhs - rhs; }
 #endif
