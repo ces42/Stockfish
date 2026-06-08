@@ -1144,7 +1144,7 @@ moves_loop:  // When in check, search starts here
                 int dIndex  = std::min(int(depth), int(lmrDivisor.size())) - 1;
                 int history = (*contHist[0])[movedPiece][move.to_sq()]
                             + (*contHist[1])[movedPiece][move.to_sq()]
-                            + sharedHistory.pawn_entry(pos)[movedPiece][move.to_sq()];
+                            + (type_of(movedPiece) != PAWN) * sharedHistory.pawn_entry(pos)[movedPiece][move.to_sq()];
 
                 // Continuation history based pruning
                 if (history < -4313 * depth)
@@ -1962,8 +1962,9 @@ void update_quiet_histories(
 
     update_continuation_histories(ss, pos.moved_piece(move), move.to_sq(), bonus * 820 / 1024);
 
-    workerThread.sharedHistory.pawn_entry(pos)[pos.moved_piece(move)][move.to_sq()]
-      << bonus * (bonus > -7 ? 1038 : 525) / 1024;
+    if (type_of(pos.moved_piece(move)) != PAWN)
+        workerThread.sharedHistory.pawn_entry(pos)[pos.moved_piece(move)][move.to_sq()]
+          << bonus * (bonus > -7 ? 1038 : 525) / 1024;
 }
 }
 
