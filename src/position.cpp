@@ -946,11 +946,11 @@ void Position::do_move(Move                      m,
     st->castlingRights &= ~(castlingRightsMask[from] | castlingRightsMask[to]);
     k ^= Zobrist::castling[st->castlingRights];
 
-    // Update the key with the (likely) final value
-    // this is only wrong when the move sets the en passant square or is a promotion
-    st->key = k;
+    // try to prefetch the key early. prefetch_key is very likely to be the correct
+    // final key
+    Key prefetched_key = k;
     if (tt)
-        prefetch(tt->first_entry(key()));
+        prefetch(tt->first_entry(adjust_key50(prefetched_key)));
 
     // Move the piece. The tricky Chess960 castling is handled earlier
     if (m.type_of() != CASTLING)
@@ -1042,8 +1042,8 @@ void Position::do_move(Move                      m,
             st->minorPieceKey ^= Zobrist::psq[pc][from] ^ Zobrist::psq[pc][to];
     }
 
-    // if the key changed since the previous prefetch, prefetch again
-    if (tt && st->key != k)
+    // if we prefetched the wrong key, prefetch again
+    if (tt && prefetched_key != k)
             prefetch(tt->first_entry(adjust_key50(k)));
     st->key = k;
 
