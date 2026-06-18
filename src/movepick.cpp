@@ -20,6 +20,7 @@
 
 #include <cassert>
 #include <limits>
+#include <new>
 #include <utility>
 
 #include "bitboard.h"
@@ -196,9 +197,13 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
 
     static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong type");
 
-    Color us = pos.side_to_move();
+    const Color us = pos.side_to_move();
 
     [[maybe_unused]] Bitboard threatByLesser[KING + 1];
+    [[maybe_unused]] const bool lowPly = ply < LOW_PLY_HISTORY_SIZE;
+    [[maybe_unused]] const auto cH = continuationHistory;
+    [[maybe_unused]] const auto mH = mainHistory;
+    [[maybe_unused]] const auto& pH = sharedHistory->pawn_entry(pos);
     if constexpr (Type == QUIETS)
     {
         threatByLesser[PAWN]   = 0;
@@ -228,13 +233,13 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
         else if constexpr (Type == QUIETS)
         {
             // histories
-            m.value = 2 * (*mainHistory)[us][m.raw()];
-            m.value += 2 * sharedHistory->pawn_entry(pos)[pc][to];
-            m.value += (*continuationHistory[0])[pc][to];
-            m.value += (*continuationHistory[1])[pc][to];
-            m.value += (*continuationHistory[2])[pc][to];
-            m.value += (*continuationHistory[3])[pc][to];
-            m.value += (*continuationHistory[5])[pc][to];
+            m.value = 2 * (*mH)[us][m.raw()];
+            m.value += 2 * pH[pc][to];
+            m.value += (*cH[0])[pc][to];
+            m.value += (*cH[1])[pc][to];
+            m.value += (*cH[2])[pc][to];
+            m.value += (*cH[3])[pc][to];
+            m.value += (*cH[5])[pc][to];
 
             // bonus for checks
             m.value += ((pos.check_squares(pt) & to) && pos.see_ge(m, -75)) * 16384;
@@ -245,7 +250,7 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
             m.value += PieceValue[pt] * v;
 
 
-            if (ply < LOW_PLY_HISTORY_SIZE)
+            if (lowPly)
                 m.value += 8 * (*lowPlyHistory)[ply][m.raw()] / (1 + ply);
         }
 
