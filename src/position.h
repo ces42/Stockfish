@@ -58,7 +58,7 @@ struct StateInfo {
     // Not copied when making a move (will be recomputed anyhow)
     Key        key;
     Bitboard   checkersBB;
-    StateInfo* previous;
+    const StateInfo* previous;
     Bitboard   blockersForKing[COLOR_NB];
     Bitboard   pinners[COLOR_NB];
     Bitboard   checkSquares[PIECE_TYPE_NB];
@@ -129,7 +129,6 @@ class Position {
     Bitboard attackers_to(Square s) const;
     Bitboard attackers_to(Square s, Bitboard occupied) const;
     bool     attackers_to_exist(Square s, Bitboard occupied, Color c) const;
-    void     update_slider_blockers(Color c) const;
     template<PieceType Pt>
     Bitboard attacks_by(Color c) const;
 
@@ -182,7 +181,7 @@ class Position {
     bool material_key_is_ok() const;
     void flip();
 
-    StateInfo* state() const;
+    const StateInfo* state() const;
 
     void put_piece(Piece pc, Square s, DirtyThreats* const dts = nullptr);
     void remove_piece(Square s, DirtyThreats* const dts = nullptr);
@@ -190,10 +189,11 @@ class Position {
 
    private:
     // Initialization helpers (used while setting up a position)
-    void set_castling_right(Color c, Square rfrom);
+    void set_castling_right(Color c, Square rfrom, StateInfo& state);
     Key  compute_material_key() const;
-    void set_state() const;
-    void set_check_info() const;
+    void set_state(StateInfo& state) const;
+    void set_check_info(StateInfo& state) const;
+    void update_slider_blockers(Color c, StateInfo& state) const;
 
     // Other helpers
     template<bool ComputeRay = true>
@@ -222,7 +222,7 @@ class Position {
     int          castlingRightsMask[SQUARE_NB];
     Square       castlingRookSquare[CASTLING_RIGHT_NB];
     Bitboard     castlingPath[CASTLING_RIGHT_NB];
-    StateInfo*   st;
+    const StateInfo* st;
     int          gamePly;
     Color        sideToMove;
     bool         chess960;
@@ -417,7 +417,7 @@ inline void Position::do_move(Move m, StateInfo& newSt, const TranspositionTable
     do_move(m, newSt, gives_check(m), scratch_dp, scratch_dts, tt, nullptr);
 }
 
-inline StateInfo* Position::state() const { return st; }
+inline const StateInfo* Position::state() const { return st; }
 
 }  // namespace Stockfish
 
