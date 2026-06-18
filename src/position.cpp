@@ -832,7 +832,7 @@ bool Position::gives_check(Move m) const {
 // If a pointer to the TT table is passed, the entry for the new position
 // will be prefetched, and likewise for shared history.
 void Position::do_move(Move                      m,
-                       StateInfo&                newSt,
+                       StateInfo&                state,
                        bool                      givesCheck,
                        DirtyPiece&               dp,
                        DirtyThreats&             dts,
@@ -840,17 +840,16 @@ void Position::do_move(Move                      m,
                        const SharedHistories*    history = nullptr) {
 
     assert(m.is_ok());
-    assert(&newSt != st);
+    assert(&state != st);
 
     Key k = st->key ^ Zobrist::side;
 
     // Copy some fields of the old state to our new StateInfo object except the
     // ones which are going to be recalculated from scratch anyway and then switch
     // our state pointer to point to the new (ready to be updated) state.
-    std::memcpy(&newSt, st, offsetof(StateInfo, key));
-    newSt.previous = st;
-    st             = &newSt;
-    StateInfo& state = newSt;
+    std::memcpy(&state, st, offsetof(StateInfo, key));
+    state.previous = st;
+    st             = &state;
 
     // Increment ply counters. In particular, rule50 will be reset to zero later on
     // in case of a capture or a pawn move.
@@ -1354,16 +1353,15 @@ void Position::do_castling(Color               us,
 
 // Used to do a "null move": it flips
 // the side to move without executing any move on the board.
-void Position::do_null_move(StateInfo& newSt) {
+void Position::do_null_move(StateInfo& state) {
 
     assert(!checkers());
-    assert(&newSt != st);
+    assert(&state != st);
 
-    std::memcpy(&newSt, st, sizeof(StateInfo));
+    std::memcpy(&state, st, sizeof(StateInfo));
 
-    newSt.previous = st;
-    st             = &newSt;
-    StateInfo& state = newSt;
+    state.previous = st;
+    st             = &state;
 
     if (state.epSquare != SQ_NONE)
     {

@@ -129,6 +129,7 @@ class Position {
     Bitboard attackers_to(Square s) const;
     Bitboard attackers_to(Square s, Bitboard occupied) const;
     bool     attackers_to_exist(Square s, Bitboard occupied, Color c) const;
+    void update_slider_blockers(Color c, StateInfo& state) const;
     template<PieceType Pt>
     Bitboard attacks_by(Color c) const;
 
@@ -142,16 +143,16 @@ class Position {
     Piece captured_piece() const;
 
     // Doing and undoing moves
-    void do_move(Move m, StateInfo& newSt, const TranspositionTable* tt);
+    void do_move(Move m, StateInfo& state, const TranspositionTable* tt);
     void do_move(Move                      m,
-                 StateInfo&                newSt,
+                 StateInfo&                state,
                  bool                      givesCheck,
                  DirtyPiece&               dp,
                  DirtyThreats&             dts,
                  const TranspositionTable* tt,
                  const SharedHistories*    worker);
     void undo_move(Move m);
-    void do_null_move(StateInfo& newSt);
+    void do_null_move(StateInfo& state);
     void undo_null_move();
 
     // Static Exchange Evaluation
@@ -193,7 +194,6 @@ class Position {
     Key  compute_material_key() const;
     void set_state(StateInfo& state) const;
     void set_check_info(StateInfo& state) const;
-    void update_slider_blockers(Color c, StateInfo& state) const;
 
     // Other helpers
     template<bool ComputeRay = true>
