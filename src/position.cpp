@@ -940,9 +940,12 @@ void Position::do_move(Move                      m,
     }
 
     // Update castling rights.
-    k ^= Zobrist::castling[st->castlingRights];
-    st->castlingRights &= ~(castlingRightsMask[from] | castlingRightsMask[to]);
-    k ^= Zobrist::castling[st->castlingRights];
+    auto cr = castlingRightsMask[from] | castlingRightsMask[to];
+    if (cr) {
+        k ^= Zobrist::castling[st->castlingRights];
+        st->castlingRights &= ~cr;
+        k ^= Zobrist::castling[st->castlingRights];
+    }
 
     // If the moving piece is a pawn do some special extra work
     if (type_of(pc) == PAWN)
