@@ -996,6 +996,7 @@ void Position::do_move(Move                      m,
             // Update hash keys
             // Zobrist::psq[pc][to] is zero, so we don't need to clear it
             k ^= Zobrist::psq[promotion][to];
+            needs_pf = true;
             st->materialKey ^= Zobrist::psq[promotion][8 + pieceCount[promotion]]
                              ^ Zobrist::psq[pc][8 + pieceCount[pc] - 1];
             st->nonPawnKey[us] ^= Zobrist::psq[promotion][to];
@@ -1024,6 +1025,7 @@ void Position::do_move(Move                      m,
 
     if (tt && needs_pf)
         prefetch(tt->first_entry(adjust_key50(k)));
+
     // Update the key with the final value
     st->key = k;
 
@@ -1322,6 +1324,27 @@ void Position::update_piece_threats(Piece               pc,
         add_dirty_threat(dts, putPiece, srcPc, pc, srcSq, s);
     }
 #endif
+}
+
+// Computes the new hash key after the given move. Needed for speculative
+// TT prefetch. It doesn't recognize special moves like castling, en passant
+// and promotions exactly; for those the prefetch simply lands elsewhere.
+Key __attribute__((pure)) Position::key_after(Move m) const {
+    Square from     = m.from_sq();
+    Square to       = m.to_sq();
+    Piece  pc       = piece_on(from);
+    Piece  captured = piece_on(to);
+    Key    k        = st->key ^ Zobrist::side;
+
+    if (captured)
+        k ^= Zobrist::psq[captured][to];
+
+    k ^= Zobrist::psq[pc][to] ^ Zobrist::psq[pc][from];
+
+    if (captured || type_of(pc) == PAWN)
+        return k;
+
+    return st->rule50 + 1 < 14 ? k : k ^ make_key((st->rule50 + 1 - 14) / 8);
 }
 
 // Helper used to do/undo a castling move. This is a bit
