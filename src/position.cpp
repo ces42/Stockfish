@@ -840,6 +840,7 @@ void Position::do_move(Move                      m,
     assert(m.is_ok());
     assert(&newSt != st);
 
+    bool needs_pf = false;
     Key k = st->key ^ Zobrist::side;
 
     // Copy some fields of the old state to our new StateInfo object except the
@@ -873,6 +874,7 @@ void Position::do_move(Move                      m,
 
     if (m.type_of() == CASTLING)
     {
+        needs_pf = true;
         assert(pc == make_piece(us, KING));
         assert(captured == make_piece(us, ROOK));
 
@@ -893,6 +895,7 @@ void Position::do_move(Move                      m,
         {
             if (m.type_of() == EN_PASSANT)
             {
+                needs_pf = true;
                 capsq -= pawn_push(us);
 
                 assert(pc == make_piece(us, PAWN));
@@ -936,6 +939,7 @@ void Position::do_move(Move                      m,
     if (st->epSquare != SQ_NONE)
     {
         k ^= Zobrist::enpassant[file_of(st->epSquare)];
+        needs_pf = true;
         st->epSquare = SQ_NONE;
     }
 
@@ -945,6 +949,7 @@ void Position::do_move(Move                      m,
         k ^= Zobrist::castling[st->castlingRights];
         st->castlingRights &= ~cr;
         k ^= Zobrist::castling[st->castlingRights];
+        needs_pf = true;
     }
 
     // If the moving piece is a pawn do some special extra work
@@ -971,6 +976,7 @@ void Position::do_move(Move                      m,
                 {
                     st->epSquare = epSquare;
                     k ^= Zobrist::enpassant[file_of(epSquare)];
+                    needs_pf = true;
                 }
             }
         }
@@ -1016,7 +1022,7 @@ void Position::do_move(Move                      m,
             st->minorPieceKey ^= Zobrist::psq[pc][from] ^ Zobrist::psq[pc][to];
     }
 
-    if (tt)
+    if (tt && needs_pf)
         prefetch(tt->first_entry(adjust_key50(k)));
     // Update the key with the final value
     st->key = k;
