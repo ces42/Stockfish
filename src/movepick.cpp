@@ -203,7 +203,7 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
     [[maybe_unused]] const bool lowPly = ply < LOW_PLY_HISTORY_SIZE;
     [[maybe_unused]] const auto cH = continuationHistory;
     [[maybe_unused]] const auto mH = mainHistory;
-    [[maybe_unused]] const auto& pH = sharedHistory->pawn_entry(pos);
+    [[maybe_unused]] AtomicStats<i16, 8192, PIECE_NB, SQUARE_NB> const * pH;
     if constexpr (Type == QUIETS)
     {
         threatByLesser[PAWN]   = 0;
@@ -212,6 +212,7 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
           pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[KNIGHT];
         threatByLesser[QUEEN] = pos.attacks_by<ROOK>(~us) | threatByLesser[ROOK];
         threatByLesser[KING]  = 0;
+        pH = &sharedHistory->pawn_entry(pos);
     }
 
     ExtMove* it = cur;
@@ -234,7 +235,7 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
         {
             // histories
             m.value = 2 * (*mH)[us][m.raw()];
-            m.value += 2 * pH[pc][to];
+            m.value += 2 * (*pH)[pc][to];
             m.value += (*cH[0])[pc][to];
             m.value += (*cH[1])[pc][to];
             m.value += (*cH[2])[pc][to];
