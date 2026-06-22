@@ -1290,7 +1290,7 @@ void Position::update_piece_threats(Piece               pc,
 #endif
 }
 
-Key Position::prefetch_key(Move m) const {
+void Position::prefetch_move(Move m, TranspositionTable& tt) const {
     Square from     = m.from_sq();
     Square to       = m.to_sq();
     Piece  pc       = piece_on(from);
@@ -1299,10 +1299,7 @@ Key Position::prefetch_key(Move m) const {
 
     k ^= Zobrist::psq[captured][to] ^ Zobrist::psq[pc][to] ^ Zobrist::psq[pc][from];
 
-    if (captured || type_of(pc) == PAWN)
-        return k;
-
-    return adjust_key50<true>(k);
+    prefetch(tt.first_entry(k));
 }
 
 // Helper used to do/undo a castling move. This is a bit
