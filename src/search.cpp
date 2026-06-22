@@ -1100,11 +1100,9 @@ moves_loop:  // When in check, search starts here
     while ((move = mp.next_move()) != Move::none())
     {
         assert(move.is_ok());
-        // dbg_hit_on(true);
 
         if (move == excludedMove)
             continue;
-        // dbg_hit_on(true, 1);
 
         // prefetch_move_key does not understand castling, castling rights, en passant
         // or promotions; for these "rare" moves the prefetch lands on an unused line.
@@ -1113,14 +1111,12 @@ moves_loop:  // When in check, search starts here
         // Check for legality
         if (!pos.legal(move))
             continue;
-        // dbg_hit_on(true, 2);
 
         // At root obey the "searchmoves" option and skip moves not listed in Root
         // Move List. In MultiPV mode we also skip PV moves that have been already
         // searched and those of lower "TB rank" if we are in a TB root position.
         if (rootNode && !std::count(rootMoves.begin() + pvIdx, rootMoves.begin() + pvLast, move))
             continue;
-        // dbg_hit_on(true, 3);
 
         ss->moveCount = ++moveCount;
 
