@@ -326,11 +326,10 @@ std::array<DebugExtremes, MaxDebugSlots> extremes;
 }  // namespace
 
 void dbg_hit_on(bool cond, int slot) {
-#ifndef DNDEBUG
+
     ++hit.at(slot)[0];
     if (cond)
         ++hit.at(slot)[1];
-#endif
 }
 
 void dbg_mean_of(i64 value, int slot) {

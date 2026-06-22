@@ -160,7 +160,7 @@ class Position {
 
     // Accessing hash keys
     Key key() const;
-    void prefetch_move_key(Move m, TranspositionTable& tt) const;
+    void prefetch_move(Move m, TranspositionTable& tt) const;
     Key material_key() const;
     Key pawn_key() const;
     Key minor_piece_key() const;

@@ -1315,7 +1315,7 @@ void Position::update_piece_threats(Piece               pc,
 #endif
 }
 
-void Position::prefetch_move_key(Move m, TranspositionTable& tt) const {
+void Position::prefetch_move(Move m, TranspositionTable& tt) const {
     Square from     = m.from_sq();
     Square to       = m.to_sq();
     Piece  pc       = piece_on(from);
