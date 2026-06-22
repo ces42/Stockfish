@@ -1315,6 +1315,18 @@ void Position::update_piece_threats(Piece               pc,
 #endif
 }
 
+void Position::prefetch_move_key(Move m, TranspositionTable& tt) const {
+    Square from     = m.from_sq();
+    Square to       = m.to_sq();
+    Piece  pc       = piece_on(from);
+    Piece  captured = piece_on(to);
+    Key    k        = st->key ^ Zobrist::side;
+
+    k ^= Zobrist::psq[captured][to] ^ Zobrist::psq[pc][to] ^ Zobrist::psq[pc][from];
+
+    prefetch(tt.first_entry(k));
+}
+
 // Helper used to do/undo a castling move. This is a bit
 // tricky in Chess960 where from/to squares can overlap.
 template<bool Do>
