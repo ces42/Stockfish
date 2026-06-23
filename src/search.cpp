@@ -634,6 +634,9 @@ void Search::Worker::do_move(Position& pos, const Move move, StateInfo& st, Stac
 
 void Search::Worker::do_move(
   Position& pos, const Move move, StateInfo& st, const bool givesCheck, Stack* const ss) {
+    // prefetch_move does not understand castling, castling rights, en passant or
+    // promotions; for these "rare" moves the prefetch lands on an unused line.
+    pos.prefetch_move(move, tt);
 
     bool capture = pos.capture_stage(move);
     ++nodes;
@@ -1104,10 +1107,6 @@ moves_loop:  // When in check, search starts here
         if (move == excludedMove)
             continue;
 
-        // prefetch_move_key does not understand castling, castling rights, en passant
-        // or promotions; for these "rare" moves the prefetch lands on an unused line.
-        pos.prefetch_move(move, tt);
-
         // Check for legality
         if (!pos.legal(move))
             continue;
@@ -1215,7 +1214,6 @@ moves_loop:  // When in check, search starts here
                     continue;
             }
         }
-        // dbg_hit_on(true, 4);
 
         // Step 15. Extensions
         // Singular extension search. If all moves but one
