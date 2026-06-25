@@ -1046,6 +1046,10 @@ Value Search::Worker::search(
         {
             assert(move.is_ok());
 
+            // prefetch_move_key does not understand castling, castling rights, en passant
+            // or promotions; for these "rare" moves the prefetch lands on an unused line.
+            pos.prefetch_move(move, tt);
+
             if (move == excludedMove || !pos.legal(move))
                 continue;
 
@@ -1215,7 +1219,6 @@ moves_loop:  // When in check, search starts here
                     continue;
             }
         }
-        // dbg_hit_on(true, 4);
 
         // Step 15. Extensions
         // Singular extension search. If all moves but one
@@ -1724,6 +1727,10 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
         if (!pos.legal(move))
             continue;
+
+        // prefetch_move_key does not understand castling, castling rights, en passant
+        // or promotions; for these "rare" moves the prefetch lands on an unused line.
+        pos.prefetch_move(move, tt);
 
         givesCheck = pos.gives_check(move);
         capture    = pos.capture_stage(move);
