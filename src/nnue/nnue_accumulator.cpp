@@ -48,6 +48,13 @@ void update_accumulator_refresh_cache(Color                     perspective,
                                       const Position&           pos,
                                       AccumulatorState&         accumulatorState,
                                       AccumulatorCaches&        cache);
+
+void update_accumulator_hybrid(Color                     perspective,
+                               const Position&           pos,
+                               const FeatureTransformer& featureTransformer,
+                               AccumulatorState&         target,
+                               const AccumulatorState&   computed,
+                               AccumulatorCaches&        cache);
 }
 
 const AccumulatorState& AccumulatorStack::latest() const noexcept { return accumulators[size - 1]; }
@@ -93,10 +100,25 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
     const auto last_usable_accum = find_last_usable_accumulator(perspective);
 
     if (accumulators[last_usable_accum].computed[perspective])
-        forward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
+        forward_update_incremental(perspective, pos.square<KING>(perspective),
+                                   featureTransformer, last_usable_accum);
 
     else
     {
+        const auto& dirtyPiece = latest().dirtyPiece;
+
+        if (dirtyPiece.pc == make_piece(perspective, KING)
+            && accumulators[size - 2].computed[perspective]
+            && pos.count<ALL_PIECES>() >= 15
+            && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
+            && dirtyPiece.add_sq == SQ_NONE
+        )
+        {
+            update_accumulator_hybrid(
+              perspective, pos, featureTransformer, mut_latest(), accumulators[size - 2], cache);
+            return;
+        }
+
         update_accumulator_refresh_cache(perspective, featureTransformer, pos, mut_latest(), cache);
         backward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
     }
@@ -121,14 +143,12 @@ usize AccumulatorStack::find_last_usable_accumulator(Color perspective) const no
 }
 
 void AccumulatorStack::forward_update_incremental(Color                     perspective,
-                                                  const Position&           pos,
+                                                  const Square              ksq,
                                                   const FeatureTransformer& featureTransformer,
                                                   const usize               begin) noexcept {
 
     assert(begin < accumulators.size());
     assert(accumulators[begin].computed[perspective]);
-
-    const Square ksq = pos.square<KING>(perspective);
 
     for (usize next = begin + 1; next < size; next++)
         update_accumulator_incremental<true>(perspective, featureTransformer, ksq,
@@ -542,6 +562,336 @@ Bitboard get_changed_pieces(const std::array<Piece, SQUARE_NB>& oldPieces,
 
     return changed;
 #endif
+}
+
+// Updates a king-move accumulator by replacing PSQ buckets and applying threat deltas.
+void update_accumulator_hybrid(Color                     perspective,
+                               const Position&           pos,
+                               const FeatureTransformer& featureTransformer,
+                               AccumulatorState&         target,
+                               const AccumulatorState&   computed,
+                               AccumulatorCaches&        cache) {
+    const auto& dirtyPiece = target.dirtyPiece;
+
+    assert(dirtyPiece.pc == make_piece(perspective, KING));
+    assert(dirtyPiece.to != SQ_NONE);
+    assert((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100));
+    assert(computed.computed[perspective]);
+    assert(!target.computed[perspective]);
+
+    const Square oldKsq = dirtyPiece.from;
+    const Square newKsq = dirtyPiece.to;
+
+    const auto& currentPieces  = pos.piece_array();
+    auto        previousPieces = currentPieces; // copies 64 bytes!!!
+
+    Bitboard previousPieceBB = pos.pieces();
+
+    assert(previousPieces[newKsq] = dirtyPiece.pc);
+
+    if (dirtyPiece.remove_sq != SQ_NONE)
+    {
+        assert(dirtyPiece.remove_sq == newKsq);
+        previousPieces[newKsq] = dirtyPiece.remove_pc;
+    } else {
+        previousPieces[newKsq] = NO_PIECE;
+        previousPieceBB &= ~square_bb(newKsq);
+    }
+
+    assert(previousPieces[oldKsq] == NO_PIECE);
+    previousPieces[oldKsq] = make_piece(perspective, KING);
+    previousPieceBB |= square_bb(oldKsq);
+
+    const auto& oldEntry = cache[oldKsq][perspective];
+    auto&       newEntry = cache[newKsq][perspective];
+
+    // "Remove" means we need to remove them from the cache entry,
+    // "Add" means add them to the entry to get the accumulator we want
+    PSQFeatureSet::IndexList oldRemove, oldAdd, newRemove, newAdd;
+
+    Bitboard oldChangedBB = get_changed_pieces(oldEntry.pieces, previousPieces);
+    Bitboard oldRemovedBB = oldChangedBB & oldEntry.pieceBB;
+    Bitboard oldAddedBB   = oldChangedBB & previousPieceBB;
+
+    Bitboard newChangedBB = get_changed_pieces(newEntry.pieces, currentPieces);
+    Bitboard newRemovedBB = newChangedBB & newEntry.pieceBB;
+    Bitboard newAddedBB   = newChangedBB & pos.pieces();
+
+#if defined(USE_AVX512ICL)
+    PSQFeatureSet::write_indices(oldEntry.pieces, previousPieces, oldRemovedBB, oldAddedBB,
+                                 perspective, oldKsq, oldRemove, oldAdd);
+    PSQFeatureSet::write_indices(newEntry.pieces, currentPieces, newRemovedBB, newAddedBB,
+                                 perspective, newKsq, newRemove, newAdd);
+#else
+    while (oldRemovedBB)
+    {
+        Square sq = pop_lsb(oldRemovedBB);
+        oldRemove.push_back(PSQFeatureSet::make_index(perspective, sq, oldEntry.pieces[sq],
+                                                       oldKsq));
+    }
+    while (oldAddedBB)
+    {
+        Square sq = pop_lsb(oldAddedBB);
+        oldAdd.push_back(PSQFeatureSet::make_index(perspective, sq, previousPieces[sq], oldKsq));
+    }
+    while (newRemovedBB)
+    {
+        Square sq = pop_lsb(newRemovedBB);
+        newRemove.push_back(PSQFeatureSet::make_index(perspective, sq, newEntry.pieces[sq],
+                                                       newKsq));
+    }
+    while (newAddedBB)
+    {
+        Square sq = pop_lsb(newAddedBB);
+        newAdd.push_back(PSQFeatureSet::make_index(perspective, sq, currentPieces[sq], newKsq));
+    }
+#endif
+
+    ThreatFeatureSet::IndexList thrRemoved, thrAdded; // also contain pp indices
+    const auto* threatBase = featureTransformer.threatWeights();
+    const auto* ppBase     = featureTransformer.ppWeights();
+    IndexType                   pfStride = FeatureTransformer::OutputDimensions;
+    ThreatFeatureSet::append_changed_indices(perspective, newKsq, target.dirtyThreats, thrRemoved,
+                                             thrAdded, threatBase, pfStride);
+    PairFeatureSet::append_changed_indices(perspective, newKsq, target.dirtyPawnPairs, thrRemoved,
+                                           thrAdded, ppBase, pfStride);
+
+    constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
+
+    const auto& fromAcc = computed.accumulation[perspective];
+    auto&       toAcc   = target.accumulation[perspective];
+
+    const auto& fromPsqtAcc = computed.psqtAccumulation[perspective];
+    auto&       toPsqtAcc   = target.psqtAccumulation[perspective];
+
+#ifdef VECTOR
+    using Tiling = SIMDTiling<Dimensions, Dimensions, PSQTBuckets>;
+
+    vec_t      acc[Tiling::NumRegs];
+    psqt_vec_t psqt[Tiling::NumPsqtRegs];
+
+    const auto* weights       = &featureTransformer.weights[0];
+    const auto* threatAndPpWeights = &featureTransformer.threatAndPpWeights[0];
+
+    for (IndexType j = 0; j < Dimensions / Tiling::TileHeight; ++j)
+    {
+        const usize tileOff      = j * Tiling::TileHeight;
+        auto*       fromTile     = reinterpret_cast<const vec_t*>(&fromAcc[tileOff]);
+        auto*       oldEntryTile = reinterpret_cast<const vec_t*>(&oldEntry.accumulation[tileOff]);
+        auto*       newEntryTile = reinterpret_cast<vec_t*>(&newEntry.accumulation[tileOff]);
+        auto*       toTile       = reinterpret_cast<vec_t*>(&toAcc[tileOff]);
+
+        for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+            acc[k] = newEntryTile[k];
+
+        for (int i = 0; i < newRemove.ssize(); ++i)
+        {
+            auto* column =
+              reinterpret_cast<const vec_t*>(&weights[newRemove[i] * Dimensions + tileOff]);
+            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+                acc[k] = vec_sub_16(acc[k], column[k]);
+        }
+        for (int i = 0; i < newAdd.ssize(); ++i)
+        {
+            auto* column =
+              reinterpret_cast<const vec_t*>(&weights[newAdd[i] * Dimensions + tileOff]);
+            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+                acc[k] = vec_add_16(acc[k], column[k]);
+        }
+
+        for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+        {
+            vec_store(&newEntryTile[k], acc[k]);
+            // ----------------------------------------------------------------
+            // this is where we add most of the threats to the accumulator
+            // ----------------------------------------------------------------
+            acc[k] = vec_add_16(acc[k], fromTile[k]);
+            // But we have added a whole bunch of psq weights for the wrong king bucket...
+            acc[k] = vec_sub_16(acc[k], oldEntryTile[k]);
+        }
+
+        for (int i = 0; i < oldRemove.ssize(); ++i)
+        {
+            auto* column =
+              reinterpret_cast<const vec_t*>(&weights[oldRemove[i] * Dimensions + tileOff]);
+            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+                acc[k] = vec_add_16(acc[k], column[k]);
+        }
+        for (int i = 0; i < oldAdd.ssize(); ++i)
+        {
+            auto* column =
+              reinterpret_cast<const vec_t*>(&weights[oldAdd[i] * Dimensions + tileOff]);
+            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+                acc[k] = vec_sub_16(acc[k], column[k]);
+        }
+
+        for (int i = 0; i < thrRemoved.ssize(); ++i)
+        {
+            auto* column = reinterpret_cast<const vec_i8_t*>(
+              &threatAndPpWeights[thrRemoved[i] * Dimensions + tileOff]);
+
+    #ifdef USE_NEON
+            for (IndexType k = 0; k < Tiling::NumRegs; k += 2)
+            {
+                acc[k]     = vsubw_s8(acc[k], vget_low_s8(column[k / 2]));
+                acc[k + 1] = vsubw_high_s8(acc[k + 1], column[k / 2]);
+            }
+    #else
+            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+                acc[k] = vec_sub_16(acc[k], vec_convert_8_16(column[k]));
+    #endif
+        }
+
+        for (int i = 0; i < thrAdded.ssize(); ++i)
+        {
+            auto* column =
+              reinterpret_cast<const vec_i8_t*>(&threatAndPpWeights[thrAdded[i] * Dimensions + tileOff]);
+
+    #ifdef USE_NEON
+            for (IndexType k = 0; k < Tiling::NumRegs; k += 2)
+            {
+                acc[k]     = vaddw_s8(acc[k], vget_low_s8(column[k / 2]));
+                acc[k + 1] = vaddw_high_s8(acc[k + 1], column[k / 2]);
+            }
+    #else
+            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+                acc[k] = vec_add_16(acc[k], vec_convert_8_16(column[k]));
+    #endif
+        }
+
+        for (IndexType k = 0; k < Tiling::NumRegs; k++)
+            vec_store(&toTile[k], acc[k]);
+    }
+
+    for (IndexType j = 0; j < PSQTBuckets / Tiling::PsqtTileHeight; ++j)
+    {
+        const usize psqtTileOff      = j * Tiling::PsqtTileHeight;
+        auto*       fromTilePsqt     =
+          reinterpret_cast<const psqt_vec_t*>(&fromPsqtAcc[psqtTileOff]);
+        auto* oldEntryTilePsqt =
+          reinterpret_cast<const psqt_vec_t*>(&oldEntry.psqtAccumulation[psqtTileOff]);
+        auto* newEntryTilePsqt =
+          reinterpret_cast<psqt_vec_t*>(&newEntry.psqtAccumulation[psqtTileOff]);
+        auto* toTilePsqt = reinterpret_cast<psqt_vec_t*>(&toPsqtAcc[psqtTileOff]);
+
+        for (IndexType k = 0; k < Tiling::NumPsqtRegs; ++k)
+            psqt[k] = newEntryTilePsqt[k];
+
+        for (int i = 0; i < newRemove.ssize(); ++i)
+        {
+            auto* columnPsqt = reinterpret_cast<const psqt_vec_t*>(
+              &featureTransformer.psqtWeights[newRemove[i] * PSQTBuckets + psqtTileOff]);
+            for (usize k = 0; k < Tiling::NumPsqtRegs; ++k)
+                psqt[k] = vec_sub_psqt_32(psqt[k], columnPsqt[k]);
+        }
+        for (int i = 0; i < newAdd.ssize(); ++i)
+        {
+            auto* columnPsqt = reinterpret_cast<const psqt_vec_t*>(
+              &featureTransformer.psqtWeights[newAdd[i] * PSQTBuckets + psqtTileOff]);
+            for (usize k = 0; k < Tiling::NumPsqtRegs; ++k)
+                psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
+        }
+
+        for (IndexType k = 0; k < Tiling::NumPsqtRegs; ++k)
+        {
+            vec_store_psqt(&newEntryTilePsqt[k], psqt[k]);
+            psqt[k] = vec_add_psqt_32(psqt[k], fromTilePsqt[k]);
+            psqt[k] = vec_sub_psqt_32(psqt[k], oldEntryTilePsqt[k]);
+        }
+
+        for (int i = 0; i < oldRemove.ssize(); ++i)
+        {
+            auto* columnPsqt = reinterpret_cast<const psqt_vec_t*>(
+              &featureTransformer.psqtWeights[oldRemove[i] * PSQTBuckets + psqtTileOff]);
+            for (usize k = 0; k < Tiling::NumPsqtRegs; ++k)
+                psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
+        }
+        for (int i = 0; i < oldAdd.ssize(); ++i)
+        {
+            auto* columnPsqt = reinterpret_cast<const psqt_vec_t*>(
+              &featureTransformer.psqtWeights[oldAdd[i] * PSQTBuckets + psqtTileOff]);
+            for (usize k = 0; k < Tiling::NumPsqtRegs; ++k)
+                psqt[k] = vec_sub_psqt_32(psqt[k], columnPsqt[k]);
+        }
+
+        for (int i = 0; i < thrRemoved.ssize(); ++i)
+        {
+            auto* columnPsqt = reinterpret_cast<const psqt_vec_t*>(
+              &featureTransformer.threatAndPpPsqtWeights[thrRemoved[i] * PSQTBuckets + psqtTileOff]);
+            for (usize k = 0; k < Tiling::NumPsqtRegs; ++k)
+                psqt[k] = vec_sub_psqt_32(psqt[k], columnPsqt[k]);
+        }
+
+        for (int i = 0; i < thrAdded.ssize(); ++i)
+        {
+            auto* columnPsqt = reinterpret_cast<const psqt_vec_t*>(
+              &featureTransformer.threatAndPpPsqtWeights[thrAdded[i] * PSQTBuckets + psqtTileOff]);
+            for (usize k = 0; k < Tiling::NumPsqtRegs; ++k)
+                psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
+        }
+
+        for (IndexType k = 0; k < Tiling::NumPsqtRegs; ++k)
+            vec_store_psqt(&toTilePsqt[k], psqt[k]);
+    }
+
+#else
+
+    for (IndexType j = 0; j < Dimensions; ++j)
+    {
+        BiasType oldPsq = oldEntry.accumulation[j];
+        for (const auto index : oldRemove)
+            oldPsq -= featureTransformer.weights[Dimensions * index + j];
+        for (const auto index : oldAdd)
+            oldPsq += featureTransformer.weights[Dimensions * index + j];
+
+        BiasType newPsq = newEntry.accumulation[j];
+        for (const auto index : newRemove)
+            newPsq -= featureTransformer.weights[Dimensions * index + j];
+        for (const auto index : newAdd)
+            newPsq += featureTransformer.weights[Dimensions * index + j];
+
+        newEntry.accumulation[j] = newPsq;
+
+        BiasType acc = fromAcc[j] - oldPsq + newPsq;
+        for (const auto index : thrRemoved)
+            acc -= featureTransformer.threatWeights[Dimensions * index + j];
+        for (const auto index : thrAdded)
+            acc += featureTransformer.threatWeights[Dimensions * index + j];
+
+        toAcc[j] = acc;
+    }
+
+    for (usize k = 0; k < PSQTBuckets; ++k)
+    {
+        PSQTWeightType oldPsq = oldEntry.psqtAccumulation[k];
+        for (const auto index : oldRemove)
+            oldPsq -= featureTransformer.psqtWeights[index * PSQTBuckets + k];
+        for (const auto index : oldAdd)
+            oldPsq += featureTransformer.psqtWeights[index * PSQTBuckets + k];
+
+        PSQTWeightType newPsq = newEntry.psqtAccumulation[k];
+        for (const auto index : newRemove)
+            newPsq -= featureTransformer.psqtWeights[index * PSQTBuckets + k];
+        for (const auto index : newAdd)
+            newPsq += featureTransformer.psqtWeights[index * PSQTBuckets + k];
+
+        newEntry.psqtAccumulation[k] = newPsq;
+
+        PSQTWeightType acc = fromPsqtAcc[k] - oldPsq + newPsq;
+        for (const auto index : thrRemoved)
+            acc -= featureTransformer.threatPsqtWeights[index * PSQTBuckets + k];
+        for (const auto index : thrAdded)
+            acc += featureTransformer.threatPsqtWeights[index * PSQTBuckets + k];
+
+        toPsqtAcc[k] = acc;
+    }
+
+#endif
+
+    newEntry.pieces  = currentPieces;
+    newEntry.pieceBB = pos.pieces();
+
+    target.computed[perspective] = true;
 }
 
 // HalfKA data comes from the Finny table entry, while the threats are built
