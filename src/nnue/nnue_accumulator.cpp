@@ -105,7 +105,7 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
         const auto& dirtyPiece = latest().dirtyPiece;
 
         if (size >= 2 && accumulators[size - 2].computed[perspective]
-            && dirtyPiece.pc == make_piece(perspective, KING) && dirtyPiece.to != SQ_NONE
+            && dirtyPiece.pc == make_piece(perspective, KING)
             && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100)))
         {
             update_accumulator_non_refreshing_king_move(
