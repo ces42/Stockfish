@@ -106,7 +106,9 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
 
         if (size >= 2 && accumulators[size - 2].computed[perspective]
             && dirtyPiece.pc == make_piece(perspective, KING)
-            && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100)))
+            && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
+            && dirtyPiece.add_sq == SQ_NONE
+        )
         {
             update_accumulator_non_refreshing_king_move(
               perspective, pos, featureTransformer, mut_latest(), accumulators[size - 2], cache);
@@ -575,12 +577,6 @@ void update_accumulator_non_refreshing_king_move(Color                     persp
     auto        previousPieces = currentPieces;
 
     Bitboard previousPieceBB = pos.pieces();
-
-    if (dirtyPiece.add_sq != SQ_NONE) // if last move was castling
-    {
-        previousPieces[dirtyPiece.add_sq] = NO_PIECE;
-        previousPieceBB &= ~square_bb(dirtyPiece.add_sq);
-    }
 
     previousPieces[dirtyPiece.to] = NO_PIECE;
     previousPieceBB &= ~square_bb(dirtyPiece.to);
