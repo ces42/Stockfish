@@ -106,16 +106,18 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
     {
         const auto& dirtyPiece = latest().dirtyPiece;
 
-        if (size >= 2 && accumulators[size - 2].computed[perspective]
-            && dirtyPiece.pc == make_piece(perspective, KING)
+        if (dirtyPiece.pc == make_piece(perspective, KING) 
+            && accumulators[size - 2].computed[perspective]
             && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
             && dirtyPiece.add_sq == SQ_NONE
         )
         {
             update_accumulator_non_refreshing_king_move(
               perspective, pos, featureTransformer, mut_latest(), accumulators[size - 2], cache);
+            // dbg_hit_on(true);
             return;
         }
+        // dbg_hit_on(false);
 
         update_accumulator_refresh_cache(perspective, featureTransformer, pos, mut_latest(), cache);
         backward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
@@ -601,7 +603,7 @@ void update_accumulator_non_refreshing_king_move(Color                     persp
     const Square newKsq = dirtyPiece.to;
 
     const auto& currentPieces  = pos.piece_array();
-    auto        previousPieces = currentPieces;
+    auto        previousPieces = currentPieces; // copies 64 bytes!!!
 
     Bitboard previousPieceBB = pos.pieces();
 
