@@ -1075,9 +1075,13 @@ void Position::do_move(Move                      m,
     dpps.after[BLACK] = pieces(BLACK, PAWN);
 
     assert(dp.pc != NO_PIECE);
-    assert(!(bool(captured) || m.type_of() == CASTLING) ^ (dp.remove_sq != SQ_NONE));
+    assert( !(bool(captured) || ( m.type_of() == CASTLING && (from != to) ))
+            ^ (dp.remove_sq != SQ_NONE)
+           );
     assert(dp.from != SQ_NONE);
-    assert(!(dp.add_sq != SQ_NONE) ^ (m.type_of() == PROMOTION || m.type_of() == CASTLING));
+    assert(!(dp.add_sq != SQ_NONE) ^
+           (m.type_of() == PROMOTION || (m.type_of() == CASTLING && (from != to)))
+           );
 }
 
 
@@ -1347,6 +1351,20 @@ void Position::do_castling(Color               us,
     to            = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
 
     assert(!Do || dp);
+
+    if (to == from) {
+        assert(rto != rfrom);
+        if (Do) {
+            dp->pc = make_piece(us, ROOK);
+            dp->to = rto;
+            dp->from = rfrom;
+            dp->remove_sq = SQ_NONE;
+        }
+        // remove_piece(Do ? rfrom : rto, dts);
+        // put_piece(make_piece(us, ROOK), Do ? rto : rfrom, dts);
+        move_piece(Do ? rfrom : rto, Do ? rto : rfrom, dts);
+        return;
+    }
 
     if (Do)
     {
