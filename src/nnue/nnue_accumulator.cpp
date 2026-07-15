@@ -36,8 +36,8 @@ using namespace SIMD;
 
 namespace {
 
-template<bool Forward>
-void update_accumulator_incremental(Color                     perspective,
+void update_accumulator_incremental(bool Forward,
+                                    Color                     perspective,
                                     const FeatureTransformer& featureTransformer,
                                     const Square              ksq,
                                     AccumulatorState&         target_state,
@@ -129,7 +129,7 @@ void AccumulatorStack::forward_update_incremental(Color                     pers
     const Square ksq = pos.square<KING>(perspective);
 
     for (usize next = begin + 1; next < size; next++)
-        update_accumulator_incremental<true>(perspective, featureTransformer, ksq,
+        update_accumulator_incremental(true, perspective, featureTransformer, ksq,
                                              accumulators[next], accumulators[next - 1]);
 
     assert(latest().computed[perspective]);
@@ -147,7 +147,7 @@ void AccumulatorStack::backward_update_incremental(Color                     per
     const Square ksq = pos.square<KING>(perspective);
 
     for (i64 next = i64(size) - 2; next >= i64(end); next--)
-        update_accumulator_incremental<false>(perspective, featureTransformer, ksq,
+        update_accumulator_incremental(false, perspective, featureTransformer, ksq,
                                               accumulators[next], accumulators[next + 1]);
 
     assert(accumulators[end].computed[perspective]);
@@ -155,15 +155,45 @@ void AccumulatorStack::backward_update_incremental(Color                     per
 
 namespace {
 
-void apply_combined(Color                              perspective,
-                    const FeatureTransformer&          featureTransformer,
-                    const AccumulatorState&            from,
-                    AccumulatorState&                  to,
-                    const PSQFeatureSet::IndexList&    psqAdded,
-                    const PSQFeatureSet::IndexList&    psqRemoved,
-                    const ThreatFeatureSet::IndexList& thrAdded,
-                    const ThreatFeatureSet::IndexList& thrRemoved) {
+void update_accumulator_incremental(bool Forward,
+                                    Color                     perspective,
+                                    const FeatureTransformer& featureTransformer,
+                                    const Square              ksq,
+                                    AccumulatorState&         to,
+                                    const AccumulatorState&   from) {
+
+    assert(from.computed[perspective]);
+    assert(!to.computed[perspective]);
+
+    // The size must be enough to contain the largest possible update.
+    // That might depend on the feature set and generally relies on the
+    // feature set's update cost calculation to be correct and never allow
+    // updates with more added/removed features than MaxActiveDimensions.
+    PSQFeatureSet::IndexList    psqRemoved, psqAdded;
+    ThreatFeatureSet::IndexList thrRemoved, thrAdded;
+
+    const auto* pfBase   = &featureTransformer.threatWeights[0];
     constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
+
+    if (Forward)
+    {
+        const auto& dirtyPiece   = to.dirtyPiece;
+        const auto& dirtyThreats = to.dirtyThreats;
+
+        ThreatFeatureSet::append_changed_indices(perspective, ksq, dirtyThreats, thrRemoved,
+                                                 thrAdded, pfBase, Dimensions);
+        PSQFeatureSet::append_changed_indices(perspective, ksq, dirtyPiece, psqRemoved, psqAdded);
+    }
+    else
+    {
+        const auto& dirtyPiece   =  from.dirtyPiece;
+        const auto& dirtyThreats =  from.dirtyThreats;
+
+        ThreatFeatureSet::append_changed_indices(perspective, ksq, dirtyThreats, thrAdded,
+                                                 thrRemoved, pfBase, Dimensions);
+        PSQFeatureSet::append_changed_indices(perspective, ksq, dirtyPiece, psqAdded, psqRemoved);
+    }
+
 
     const auto& fromAcc = from.accumulation[perspective];
     auto&       toAcc   = to.accumulation[perspective];
@@ -388,48 +418,7 @@ void apply_combined(Color                              perspective,
     }
 
 #endif
-}
-
-template<bool Forward>
-void update_accumulator_incremental(Color                     perspective,
-                                    const FeatureTransformer& featureTransformer,
-                                    const Square              ksq,
-                                    AccumulatorState&         target_state,
-                                    const AccumulatorState&   computed) {
-
-    assert(computed.computed[perspective]);
-    assert(!target_state.computed[perspective]);
-
-    // The size must be enough to contain the largest possible update.
-    // That might depend on the feature set and generally relies on the
-    // feature set's update cost calculation to be correct and never allow
-    // updates with more added/removed features than MaxActiveDimensions.
-    PSQFeatureSet::IndexList    psqRemoved, psqAdded;
-    ThreatFeatureSet::IndexList thrRemoved, thrAdded;
-
-    const auto& dirtyPiece   = Forward ? target_state.dirtyPiece : computed.dirtyPiece;
-    const auto& dirtyThreats = Forward ? target_state.dirtyThreats : computed.dirtyThreats;
-
-    const auto* pfBase   = &featureTransformer.threatWeights[0];
-    IndexType   pfStride = FeatureTransformer::OutputDimensions;
-
-    if constexpr (Forward)
-    {
-        ThreatFeatureSet::append_changed_indices(perspective, ksq, dirtyThreats, thrRemoved,
-                                                 thrAdded, pfBase, pfStride);
-        PSQFeatureSet::append_changed_indices(perspective, ksq, dirtyPiece, psqRemoved, psqAdded);
-    }
-    else
-    {
-        ThreatFeatureSet::append_changed_indices(perspective, ksq, dirtyThreats, thrAdded,
-                                                 thrRemoved, pfBase, pfStride);
-        PSQFeatureSet::append_changed_indices(perspective, ksq, dirtyPiece, psqAdded, psqRemoved);
-    }
-
-    apply_combined(perspective, featureTransformer, computed, target_state, psqAdded, psqRemoved,
-                   thrAdded, thrRemoved);
-
-    target_state.computed[perspective] = true;
+    to.computed[perspective] = true;
 }
 
 Bitboard get_changed_pieces(const std::array<Piece, SQUARE_NB>& oldPieces,
