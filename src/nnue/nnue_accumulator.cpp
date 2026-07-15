@@ -106,6 +106,7 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
 
         if (dirtyPiece.pc == make_piece(perspective, KING) 
             && accumulators[size - 2].computed[perspective]
+            && pos.count<ALL_PIECES>() >= 12
             && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
             && dirtyPiece.add_sq == SQ_NONE
         )
