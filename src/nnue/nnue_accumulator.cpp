@@ -666,10 +666,13 @@ void update_accumulator_non_refreshing_king_move(Color                     persp
 #endif
 
     ThreatFeatureSet::IndexList thrRemoved, thrAdded;
-    const auto*                 pfBase   = &featureTransformer.threatWeights[0];
+    const auto* threatBase = featureTransformer.threatWeights();
+    const auto* ppBase     = featureTransformer.ppWeights();
     IndexType                   pfStride = FeatureTransformer::OutputDimensions;
     ThreatFeatureSet::append_changed_indices(perspective, newKsq, target.dirtyThreats, thrRemoved,
-                                             thrAdded, pfBase, pfStride);
+                                             thrAdded, threatBase, pfStride);
+    PairFeatureSet::append_changed_indices(perspective, newKsq, target.dirtyPawnPairs, thrRemoved,
+                                           thrAdded, ppBase, pfStride);
 
     constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
 
@@ -686,7 +689,7 @@ void update_accumulator_non_refreshing_king_move(Color                     persp
     psqt_vec_t psqt[Tiling::NumPsqtRegs];
 
     const auto* weights       = &featureTransformer.weights[0];
-    const auto* threatWeights = &featureTransformer.threatWeights[0];
+    const auto* threatAndPpWeights = &featureTransformer.threatAndPpWeights[0];
 
     for (IndexType j = 0; j < Dimensions / Tiling::TileHeight; ++j)
     {
@@ -743,7 +746,7 @@ void update_accumulator_non_refreshing_king_move(Color                     persp
         for (int i = 0; i < thrRemoved.ssize(); ++i)
         {
             auto* column = reinterpret_cast<const vec_i8_t*>(
-              &threatWeights[thrRemoved[i] * Dimensions + tileOff]);
+              &threatAndPpWeights[thrRemoved[i] * Dimensions + tileOff]);
 
     #ifdef USE_NEON
             for (IndexType k = 0; k < Tiling::NumRegs; k += 2)
@@ -760,7 +763,7 @@ void update_accumulator_non_refreshing_king_move(Color                     persp
         for (int i = 0; i < thrAdded.ssize(); ++i)
         {
             auto* column =
-              reinterpret_cast<const vec_i8_t*>(&threatWeights[thrAdded[i] * Dimensions + tileOff]);
+              reinterpret_cast<const vec_i8_t*>(&threatAndPpWeights[thrAdded[i] * Dimensions + tileOff]);
 
     #ifdef USE_NEON
             for (IndexType k = 0; k < Tiling::NumRegs; k += 2)
@@ -832,7 +835,7 @@ void update_accumulator_non_refreshing_king_move(Color                     persp
         for (int i = 0; i < thrRemoved.ssize(); ++i)
         {
             auto* columnPsqt = reinterpret_cast<const psqt_vec_t*>(
-              &featureTransformer.threatPsqtWeights[thrRemoved[i] * PSQTBuckets + psqtTileOff]);
+              &featureTransformer.threatAndPpPsqtWeights[thrRemoved[i] * PSQTBuckets + psqtTileOff]);
             for (usize k = 0; k < Tiling::NumPsqtRegs; ++k)
                 psqt[k] = vec_sub_psqt_32(psqt[k], columnPsqt[k]);
         }
@@ -840,7 +843,7 @@ void update_accumulator_non_refreshing_king_move(Color                     persp
         for (int i = 0; i < thrAdded.ssize(); ++i)
         {
             auto* columnPsqt = reinterpret_cast<const psqt_vec_t*>(
-              &featureTransformer.threatPsqtWeights[thrAdded[i] * PSQTBuckets + psqtTileOff]);
+              &featureTransformer.threatAndPpPsqtWeights[thrAdded[i] * PSQTBuckets + psqtTileOff]);
             for (usize k = 0; k < Tiling::NumPsqtRegs; ++k)
                 psqt[k] = vec_add_psqt_32(psqt[k], columnPsqt[k]);
         }
