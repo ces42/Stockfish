@@ -49,12 +49,12 @@ void update_accumulator_refresh_cache(Color                     perspective,
                                       AccumulatorState&         accumulatorState,
                                       AccumulatorCaches&        cache);
 
-void update_accumulator_non_refreshing_king_move(Color                     perspective,
-                                                 const Position&           pos,
-                                                 const FeatureTransformer& featureTransformer,
-                                                 AccumulatorState&         target,
-                                                 const AccumulatorState&   computed,
-                                                 AccumulatorCaches&        cache);
+void update_accumulator_hybrid(Color                     perspective,
+                               const Position&           pos,
+                               const FeatureTransformer& featureTransformer,
+                               AccumulatorState&         target,
+                               const AccumulatorState&   computed,
+                               AccumulatorCaches&        cache);
 }
 
 const AccumulatorState& AccumulatorStack::latest() const noexcept { return accumulators[size - 1]; }
@@ -98,25 +98,38 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
     const auto last_usable_accum = find_last_usable_accumulator(perspective);
 
     if (accumulators[last_usable_accum].computed[perspective])
-        forward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
+        forward_update_incremental(perspective, pos.square<KING>(perspective),
+                                   featureTransformer, last_usable_accum);
 
     else
     {
         const auto& dirtyPiece = latest().dirtyPiece;
 
-        if (dirtyPiece.pc == make_piece(perspective, KING) 
-            && accumulators[size - 2].computed[perspective]
+        if (dirtyPiece.pc == make_piece(perspective, KING)
             && pos.count<ALL_PIECES>() >= 12
             && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
             && dirtyPiece.add_sq == SQ_NONE
         )
         {
-            update_accumulator_non_refreshing_king_move(
-              perspective, pos, featureTransformer, mut_latest(), accumulators[size - 2], cache);
-            // dbg_hit_on(true);
-            return;
+            for (int curr_idx = int(size) - 2; curr_idx >= 0; curr_idx--)
+            {
+                if (accumulators[curr_idx].computed[perspective])
+                {
+                    for (usize next = curr_idx; next < size - 2; next++)
+                        update_accumulator_incremental<true>(perspective, featureTransformer, dirtyPiece.from,
+                                                             accumulators[next + 1], accumulators[next]);
+
+                    update_accumulator_hybrid(
+                      perspective, pos, featureTransformer, mut_latest(), accumulators[size - 2], cache);
+                    return;
+                }
+
+                // at this point we just abort
+                if (PSQFeatureSet::requires_refresh(accumulators[curr_idx].dirtyPiece, perspective))
+                    break;
+            }
+
         }
-        // dbg_hit_on(false);
 
         update_accumulator_refresh_cache(perspective, featureTransformer, pos, mut_latest(), cache);
         backward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
@@ -142,14 +155,12 @@ usize AccumulatorStack::find_last_usable_accumulator(Color perspective) const no
 }
 
 void AccumulatorStack::forward_update_incremental(Color                     perspective,
-                                                  const Position&           pos,
+                                                  const Square              ksq,
                                                   const FeatureTransformer& featureTransformer,
                                                   const usize               begin) noexcept {
 
     assert(begin < accumulators.size());
     assert(accumulators[begin].computed[perspective]);
-
-    const Square ksq = pos.square<KING>(perspective);
 
     for (usize next = begin + 1; next < size; next++)
         update_accumulator_incremental<true>(perspective, featureTransformer, ksq,
@@ -559,7 +570,7 @@ Bitboard get_changed_pieces(const std::array<Piece, SQUARE_NB>& oldPieces,
 }
 
 // Updates a king-move accumulator by replacing PSQ buckets and applying threat deltas.
-void update_accumulator_non_refreshing_king_move(Color                     perspective,
+void update_accumulator_hybrid(Color                     perspective,
                                                  const Position&           pos,
                                                  const FeatureTransformer& featureTransformer,
                                                  AccumulatorState&         target,
