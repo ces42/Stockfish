@@ -120,7 +120,7 @@ class AccumulatorStack {
     [[nodiscard]] usize find_last_usable_accumulator(Color perspective) const noexcept;
 
     void forward_update_incremental(Color                     perspective,
-                                    const Position&           pos,
+                                    Square                    ksq,
                                     const FeatureTransformer& featureTransformer,
                                     const usize               begin) noexcept;
 
