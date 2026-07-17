@@ -108,7 +108,7 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
         const auto& dirtyPiece = latest().dirtyPiece;
 
         if (dirtyPiece.pc == make_piece(perspective, KING)
-            && pos.count<ALL_PIECES>() >= 12
+            && pos.count<ALL_PIECES>() >= 15
             && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
             && dirtyPiece.add_sq == SQ_NONE
         )
@@ -619,17 +619,20 @@ void update_accumulator_hybrid(Color                     perspective,
 
     Bitboard previousPieceBB = pos.pieces();
 
-    previousPieces[dirtyPiece.to] = NO_PIECE;
-    previousPieceBB &= ~square_bb(dirtyPiece.to);
+    assert(previousPieces[newKsq] = dirtyPiece.pc);
 
     if (dirtyPiece.remove_sq != SQ_NONE)
     {
-        previousPieces[dirtyPiece.remove_sq] = dirtyPiece.remove_pc;
-        previousPieceBB |= square_bb(dirtyPiece.remove_sq);
+        assert(dirtyPiece.remove_sq == newKsq);
+        previousPieces[newKsq] = dirtyPiece.remove_pc;
+    } else {
+        previousPieces[newKsq] = NO_PIECE;
+        previousPieceBB &= ~square_bb(newKsq);
     }
 
-    previousPieces[dirtyPiece.from] = dirtyPiece.pc;
-    previousPieceBB |= square_bb(dirtyPiece.from);
+    assert(previousPieces[oldKsq] == NO_PIECE);
+    previousPieces[oldKsq] = make_piece(perspective, KING);
+    previousPieceBB |= square_bb(oldKsq);
 
     const auto& oldEntry = cache[oldKsq][perspective];
     auto&       newEntry = cache[newKsq][perspective];
@@ -676,7 +679,7 @@ void update_accumulator_hybrid(Color                     perspective,
     }
 #endif
 
-    ThreatFeatureSet::IndexList thrRemoved, thrAdded;
+    ThreatFeatureSet::IndexList thrRemoved, thrAdded; // also contain pp indices
     const auto* threatBase = featureTransformer.threatWeights();
     const auto* ppBase     = featureTransformer.ppWeights();
     IndexType                   pfStride = FeatureTransformer::OutputDimensions;
