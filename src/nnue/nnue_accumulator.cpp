@@ -108,29 +108,15 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
         const auto& dirtyPiece = latest().dirtyPiece;
 
         if (dirtyPiece.pc == make_piece(perspective, KING)
+            && accumulators[size - 2].computed[perspective]
             && pos.count<ALL_PIECES>() >= 15
             && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
             && dirtyPiece.add_sq == SQ_NONE
         )
         {
-            for (int curr_idx = int(size) - 2; curr_idx >= 0; curr_idx--)
-            {
-                if (accumulators[curr_idx].computed[perspective])
-                {
-                    for (usize next = curr_idx; next < size - 2; next++)
-                        update_accumulator_incremental<true>(perspective, featureTransformer, dirtyPiece.from,
-                                                             accumulators[next + 1], accumulators[next]);
-
-                    update_accumulator_hybrid(
-                      perspective, pos, featureTransformer, mut_latest(), accumulators[size - 2], cache);
-                    return;
-                }
-
-                // at this point we just abort
-                if (PSQFeatureSet::requires_refresh(accumulators[curr_idx].dirtyPiece, perspective))
-                    break;
-            }
-
+            update_accumulator_hybrid(
+              perspective, pos, featureTransformer, mut_latest(), accumulators[size - 2], cache);
+            return;
         }
 
         update_accumulator_refresh_cache(perspective, featureTransformer, pos, mut_latest(), cache);
@@ -598,11 +584,11 @@ Bitboard get_changed_pieces(const std::array<Piece, SQUARE_NB>& oldPieces,
 
 // Updates a king-move accumulator by replacing PSQ buckets and applying threat deltas.
 void update_accumulator_hybrid(Color                     perspective,
-                                                 const Position&           pos,
-                                                 const FeatureTransformer& featureTransformer,
-                                                 AccumulatorState&         target,
-                                                 const AccumulatorState&   computed,
-                                                 AccumulatorCaches&        cache) {
+                               const Position&           pos,
+                               const FeatureTransformer& featureTransformer,
+                               AccumulatorState&         target,
+                               const AccumulatorState&   computed,
+                               AccumulatorCaches&        cache) {
     const auto& dirtyPiece = target.dirtyPiece;
 
     assert(dirtyPiece.pc == make_piece(perspective, KING));
