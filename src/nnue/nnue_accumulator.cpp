@@ -841,55 +841,73 @@ void update_accumulator_hybrid(Color                     perspective,
     }
 
 #else
+    for (const auto index : newRemove)
+    {
+        const IndexType offset = Dimensions * index;
+        for (IndexType j = 0; j < Dimensions; ++j)
+            newEntry.accumulation[j] -= featureTransformer.weights[offset + j];
+
+        for (usize k = 0; k < PSQTBuckets; ++k)
+            newEntry.psqtAccumulation[k] -= featureTransformer.psqtWeights[index * PSQTBuckets + k];
+    }
+    for (const auto index : newAdd)
+    {
+        const IndexType offset = Dimensions * index;
+        for (IndexType j = 0; j < Dimensions; ++j)
+            newEntry.accumulation[j] += featureTransformer.weights[offset + j];
+
+        for (usize k = 0; k < PSQTBuckets; ++k)
+            newEntry.psqtAccumulation[k] += featureTransformer.psqtWeights[index * PSQTBuckets + k];
+    }
+
+    toAcc     = newEntry.accumulation;
+    toPsqtAcc = newEntry.psqtAccumulation;
 
     for (IndexType j = 0; j < Dimensions; ++j)
     {
-        BiasType oldPsq = oldEntry.accumulation[j];
-        for (const auto index : oldRemove)
-            oldPsq -= featureTransformer.weights[Dimensions * index + j];
-        for (const auto index : oldAdd)
-            oldPsq += featureTransformer.weights[Dimensions * index + j];
-
-        BiasType newPsq = newEntry.accumulation[j];
-        for (const auto index : newRemove)
-            newPsq -= featureTransformer.weights[Dimensions * index + j];
-        for (const auto index : newAdd)
-            newPsq += featureTransformer.weights[Dimensions * index + j];
-
-        newEntry.accumulation[j] = newPsq;
-
-        BiasType acc = fromAcc[j] - oldPsq + newPsq;
-        for (const auto index : thrRemoved)
-            acc -= featureTransformer.threatWeights[Dimensions * index + j];
-        for (const auto index : thrAdded)
-            acc += featureTransformer.threatWeights[Dimensions * index + j];
-
-        toAcc[j] = acc;
+        toAcc[j] += fromAcc[j];
+        toAcc[j] -= oldEntry.accumulation[j];
     }
-
     for (usize k = 0; k < PSQTBuckets; ++k)
     {
-        PSQTWeightType oldPsq = oldEntry.psqtAccumulation[k];
-        for (const auto index : oldRemove)
-            oldPsq -= featureTransformer.psqtWeights[index * PSQTBuckets + k];
-        for (const auto index : oldAdd)
-            oldPsq += featureTransformer.psqtWeights[index * PSQTBuckets + k];
+        toPsqtAcc[k] += fromPsqtAcc[k];
+        toPsqtAcc[k] -= oldEntry.psqtAccumulation[k];
+    }
 
-        PSQTWeightType newPsq = newEntry.psqtAccumulation[k];
-        for (const auto index : newRemove)
-            newPsq -= featureTransformer.psqtWeights[index * PSQTBuckets + k];
-        for (const auto index : newAdd)
-            newPsq += featureTransformer.psqtWeights[index * PSQTBuckets + k];
+    for (const auto index : oldRemove)
+    {
+        const IndexType offset = Dimensions * index;
+        for (IndexType j = 0; j < Dimensions; ++j)
+            toAcc[j] += featureTransformer.weights[offset + j];
 
-        newEntry.psqtAccumulation[k] = newPsq;
+        for (usize k = 0; k < PSQTBuckets; ++k)
+            toPsqtAcc[k] += featureTransformer.psqtWeights[index * PSQTBuckets + k];
+    }
+    for (const auto index : oldAdd)
+    {
+        const IndexType offset = Dimensions * index;
+        for (IndexType j = 0; j < Dimensions; ++j)
+            toAcc[j] -= featureTransformer.weights[offset + j];
 
-        PSQTWeightType acc = fromPsqtAcc[k] - oldPsq + newPsq;
-        for (const auto index : thrRemoved)
-            acc -= featureTransformer.threatPsqtWeights[index * PSQTBuckets + k];
-        for (const auto index : thrAdded)
-            acc += featureTransformer.threatPsqtWeights[index * PSQTBuckets + k];
+        for (usize k = 0; k < PSQTBuckets; ++k)
+            toPsqtAcc[k] -= featureTransformer.psqtWeights[index * PSQTBuckets + k];
+    }
 
-        toPsqtAcc[k] = acc;
+    for (const auto index : thrRemoved)
+    {
+        const IndexType offset = Dimensions * index;
+        for (IndexType j = 0; j < Dimensions; ++j)
+            toAcc[j] -= featureTransformer.threatAndPpWeights[offset + j];
+        for (usize k = 0; k < PSQTBuckets; ++k)
+            toPsqtAcc[k] -= featureTransformer.threatAndPpPsqtWeights[index * PSQTBuckets + k];
+    }
+    for (const auto index : thrAdded)
+    {
+        const IndexType offset = Dimensions * index;
+        for (IndexType j = 0; j < Dimensions; ++j)
+            toAcc[j] += featureTransformer.threatAndPpWeights[offset + j];
+        for (usize k = 0; k < PSQTBuckets; ++k)
+            toPsqtAcc[k] += featureTransformer.threatAndPpPsqtWeights[index * PSQTBuckets + k];
     }
 
 #endif
