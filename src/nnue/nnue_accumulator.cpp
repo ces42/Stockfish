@@ -195,12 +195,12 @@ inline void apply_psq_features(int sign,
     const usize tileOff    = j * Tiling::TileHeight;
     for (int i = 0; i < list.ssize(); ++i)
     {
-        auto* row = reinterpret_cast<const vec_t*>(&ft.weights[list[i] * Dimensions + tileOff]);
+        auto* column = reinterpret_cast<const vec_t*>(&ft.weights[list[i] * Dimensions + tileOff]);
         for (IndexType k = 0; k < Tiling::NumRegs; ++k)
             if (sign == +1)
-                acc[k] = vec_add_16(acc[k], row[k]);
+                acc[k] = vec_add_16(acc[k], column[k]);
             else if (sign == -1)
-                acc[k] = vec_sub_16(acc[k], row[k]);
+                acc[k] = vec_sub_16(acc[k], column[k]);
     }
 }
 
@@ -214,7 +214,7 @@ inline void apply_threat_features(int sign,
     const usize tileOff    = j * Tiling::TileHeight;
     for (int i = 0; i < list.ssize(); ++i)
     {
-        auto* row = reinterpret_cast<const vec_i8_t*>(&ft.threatAndPpWeights[list[i] * Dimensions + tileOff]);
+        auto* column = reinterpret_cast<const vec_i8_t*>(&ft.threatAndPpWeights[list[i] * Dimensions + tileOff]);
 #ifdef USE_NEON
         for (IndexType k = 0; k < Tiling::NumRegs; k += 2)
         {
@@ -232,9 +232,9 @@ inline void apply_threat_features(int sign,
 #else
         for (IndexType k = 0; k < Tiling::NumRegs; ++k)
             if (sign == +1)
-                acc[k] = vec_add_16(acc[k], vec_convert_8_16(row[k]));
+                acc[k] = vec_add_16(acc[k], vec_convert_8_16(column[k]));
             else if (sign == -1)
-                acc[k] = vec_sub_16(acc[k], vec_convert_8_16(row[k]));
+                acc[k] = vec_sub_16(acc[k], vec_convert_8_16(column[k]));
 #endif
     }
 }
@@ -913,9 +913,6 @@ void update_accumulator_refresh_cache(Color                     perspective,
     vec_t      acc[Tiling::NumRegs];
     psqt_vec_t psqt[Tiling::NumPsqtRegs];
 
-    const auto* weights            = &featureTransformer.weights[0];
-    const auto* threatAndPpWeights = &featureTransformer.threatAndPpWeights[0];
-
     for (IndexType j = 0; j < Dimensions / Tiling::TileHeight; ++j)
     {
         const usize tileOff = j * Tiling::TileHeight;
@@ -925,40 +922,13 @@ void update_accumulator_refresh_cache(Color                     perspective,
         for (IndexType k = 0; k < Tiling::NumRegs; ++k)
             acc[k] = entryTile[k];
 
-        for (int i = 0; i < removed.ssize(); ++i)
-        {
-            auto* column =
-              reinterpret_cast<const vec_t*>(&weights[removed[i] * Dimensions + tileOff]);
-            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-                acc[k] = vec_sub_16(acc[k], column[k]);
-        }
-        for (int i = 0; i < added.ssize(); ++i)
-        {
-            auto* column =
-              reinterpret_cast<const vec_t*>(&weights[added[i] * Dimensions + tileOff]);
-            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-                acc[k] = vec_add_16(acc[k], column[k]);
-        }
+        apply_psq_features(-1, j, acc, removed, featureTransformer);
+        apply_psq_features(+1, j, acc, added, featureTransformer);
 
         for (IndexType k = 0; k < Tiling::NumRegs; k++)
             vec_store(&entryTile[k], acc[k]);
 
-        for (int i = 0; i < active.ssize(); ++i)
-        {
-            auto* column = reinterpret_cast<const vec_i8_t*>(
-              &threatAndPpWeights[active[i] * Dimensions + tileOff]);
-
-    #ifdef USE_NEON
-            for (IndexType k = 0; k < Tiling::NumRegs; k += 2)
-            {
-                acc[k]     = vaddw_s8(acc[k], vget_low_s8(column[k / 2]));
-                acc[k + 1] = vaddw_high_s8(acc[k + 1], column[k / 2]);
-            }
-    #else
-            for (IndexType k = 0; k < Tiling::NumRegs; ++k)
-                acc[k] = vec_add_16(acc[k], vec_convert_8_16(column[k]));
-    #endif
-        }
+        apply_threat_features(+1, j, acc, active, featureTransformer);
 
         for (IndexType k = 0; k < Tiling::NumRegs; k++)
             vec_store(&accTile[k], acc[k]);
