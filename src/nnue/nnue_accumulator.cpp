@@ -97,11 +97,12 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
                                      const FeatureTransformer& featureTransformer,
                                      AccumulatorCaches&        cache) noexcept {
 
+    constexpr int MIN_PC_COUNT_HYBRID = 15;
+
     const auto last_usable_accum = find_last_usable_accumulator(perspective);
 
     if (accumulators[last_usable_accum].computed[perspective])
-        forward_update_incremental(perspective, pos.square<KING>(perspective),
-                                   featureTransformer, last_usable_accum);
+        forward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
 
     else
     {
@@ -109,9 +110,9 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
 
         if (dirtyPiece.pc == make_piece(perspective, KING)
             && accumulators[size - 2].computed[perspective]
-            && pos.count<ALL_PIECES>() >= 15
+            && pos.count<ALL_PIECES>() >= MIN_PC_COUNT_HYBRID
             && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
-            && dirtyPiece.add_sq == SQ_NONE
+            && dirtyPiece.add_sq == SQ_NONE // excludes castling
         )
         {
             update_accumulator_hybrid(
@@ -143,12 +144,14 @@ usize AccumulatorStack::find_last_usable_accumulator(Color perspective) const no
 }
 
 void AccumulatorStack::forward_update_incremental(Color                     perspective,
-                                                  const Square              ksq,
+                                                  const Position&           pos,
                                                   const FeatureTransformer& featureTransformer,
                                                   const usize               begin) noexcept {
 
     assert(begin < accumulators.size());
     assert(accumulators[begin].computed[perspective]);
+
+    const Square ksq = pos.square<KING>(perspective);
 
     for (usize next = begin + 1; next < size; next++)
         update_accumulator_incremental<true>(perspective, featureTransformer, ksq,
@@ -564,7 +567,8 @@ Bitboard get_changed_pieces(const std::array<Piece, SQUARE_NB>& oldPieces,
 #endif
 }
 
-// Updates a king-move accumulator by replacing PSQ buckets and applying threat deltas.
+// Updates accumulator for a king move, and also updates the accumulator cache
+// for the new king position.
 void update_accumulator_hybrid(Color                     perspective,
                                const Position&           pos,
                                const FeatureTransformer& featureTransformer,
@@ -581,13 +585,14 @@ void update_accumulator_hybrid(Color                     perspective,
 
     const Square oldKsq = dirtyPiece.from;
     const Square newKsq = dirtyPiece.to;
+    assert(oldKsq != newKsq);
 
     const auto& currentPieces  = pos.piece_array();
-    auto        previousPieces = currentPieces; // copies 64 bytes!!!
+    auto        previousPieces = currentPieces; // copies 64 bytes!
 
     Bitboard previousPieceBB = pos.pieces();
 
-    assert(previousPieces[newKsq] = dirtyPiece.pc);
+    assert(previousPieces[newKsq] == dirtyPiece.pc);
 
     if (dirtyPiece.remove_sq != SQ_NONE)
     {
@@ -702,14 +707,15 @@ void update_accumulator_hybrid(Color                     perspective,
         for (IndexType k = 0; k < Tiling::NumRegs; ++k)
         {
             vec_store(&newEntryTile[k], acc[k]);
-            // ----------------------------------------------------------------
-            // this is where we add most of the threats to the accumulator
-            // ----------------------------------------------------------------
+            // adding the old accumulator adds (most of) the threats and pp weights that we need
             acc[k] = vec_add_16(acc[k], fromTile[k]);
-            // But we have added a whole bunch of psq weights for the wrong king bucket...
+            // But we have added a whole bunch of psq weights for the wrong king bucket which
+            // we need to remove
+            // first we remove the cached psq accumulation for the old king position...
             acc[k] = vec_sub_16(acc[k], oldEntryTile[k]);
         }
 
+        // ... then we adjust
         for (int i = 0; i < oldRemove.ssize(); ++i)
         {
             auto* column =
