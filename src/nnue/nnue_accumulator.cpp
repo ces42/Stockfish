@@ -180,16 +180,17 @@ void AccumulatorStack::backward_update_incremental(Color                     per
 
 namespace {
 
+constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
+
 #ifdef VECTOR
 
-constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
 using Tiling = SIMDTiling<Dimensions, Dimensions, PSQTBuckets>;
 
 template<int sign>
-inline void apply_psq_features(IndexType j,
-                               vec_t acc[],
-                               const PSQFeatureSet::IndexList& list,
-                               const FeatureTransformer& ft) {
+sf_always_inline inline void apply_psq_features(IndexType j,
+                                                vec_t acc[],
+                                                const PSQFeatureSet::IndexList& list,
+                                                const FeatureTransformer& ft) {
     static_assert(sign == 1 || sign == -1);
 
     const usize tileOff    = j * Tiling::TileHeight;
@@ -199,16 +200,16 @@ inline void apply_psq_features(IndexType j,
         for (IndexType k = 0; k < Tiling::NumRegs; ++k)
             if constexpr (sign == +1)
                 acc[k] = vec_add_16(acc[k], column[k]);
-            else if (sign == -1)
+            else
                 acc[k] = vec_sub_16(acc[k], column[k]);
     }
 }
 
 template<int sign>
-inline void apply_threat_features(IndexType j,
-                                  vec_t acc[],
-                                  const PairFeatureSet::IndexList& list,
-                                  const FeatureTransformer& ft) {
+sf_always_inline inline void apply_threat_features(IndexType j,
+                                                   vec_t acc[],
+                                                   const ThreatFeatureSet::IndexList& list,
+                                                   const FeatureTransformer& ft) {
     static_assert(sign == 1 || sign == -1);
 
     const usize tileOff    = j * Tiling::TileHeight;
@@ -220,20 +221,20 @@ inline void apply_threat_features(IndexType j,
         {
             if constexpr (sign == +1)
             {
-                acc[k]     = vaddw_s8(acc[k], vget_low_s8(row[k / 2]));
-                acc[k + 1] = vaddw_high_s8(acc[k + 1], row[k / 2]);
+                acc[k]     = vaddw_s8(acc[k], vget_low_s8(column[k / 2]));
+                acc[k + 1] = vaddw_high_s8(acc[k + 1], column[k / 2]);
             }
-            else if (sign == -1)
+            else
             {
-                acc[k]     = vsubw_s8(acc[k], vget_low_s8(row[k / 2]));
-                acc[k + 1] = vsubw_high_s8(acc[k + 1], row[k / 2]);
+                acc[k]     = vsubw_s8(acc[k], vget_low_s8(column[k / 2]));
+                acc[k + 1] = vsubw_high_s8(acc[k + 1], column[k / 2]);
             }
         }
 #else
         for (IndexType k = 0; k < Tiling::NumRegs; ++k)
             if constexpr (sign == +1)
                 acc[k] = vec_add_16(acc[k], vec_convert_8_16(column[k]));
-            else if (sign == -1)
+            else
                 acc[k] = vec_sub_16(acc[k], vec_convert_8_16(column[k]));
 #endif
     }
