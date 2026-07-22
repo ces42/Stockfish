@@ -112,7 +112,7 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
             && accumulators[size - 2].computed[perspective]
             && pos.count<ALL_PIECES>() >= MIN_PC_COUNT_HYBRID
             && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
-            && dirtyPiece.add_sq == SQ_NONE // excludes castling
+            && dirtyPiece.remove_sq == SQ_NONE // excludes captures and castling
         )
         {
             update_accumulator_hybrid(
@@ -594,14 +594,8 @@ void update_accumulator_hybrid(Color                     perspective,
 
     assert(previousPieces[newKsq] == dirtyPiece.pc);
 
-    if (dirtyPiece.remove_sq != SQ_NONE)
-    {
-        assert(dirtyPiece.remove_sq == newKsq);
-        previousPieces[newKsq] = dirtyPiece.remove_pc;
-    } else {
-        previousPieces[newKsq] = NO_PIECE;
-        previousPieceBB &= ~square_bb(newKsq);
-    }
+    previousPieces[newKsq] = NO_PIECE;
+    previousPieceBB &= ~square_bb(newKsq);
 
     assert(previousPieces[oldKsq] == NO_PIECE);
     previousPieces[oldKsq] = make_piece(perspective, KING);
@@ -654,12 +648,9 @@ void update_accumulator_hybrid(Color                     perspective,
 
     ThreatFeatureSet::IndexList thrRemoved, thrAdded; // also contain pp indices
     const auto* threatBase = featureTransformer.threatWeights();
-    const auto* ppBase     = featureTransformer.ppWeights();
     IndexType                   pfStride = FeatureTransformer::OutputDimensions;
     ThreatFeatureSet::append_changed_indices(perspective, newKsq, target.dirtyThreats, thrRemoved,
                                              thrAdded, threatBase, pfStride);
-    PairFeatureSet::append_changed_indices(perspective, newKsq, target.dirtyPawnPairs, thrRemoved,
-                                           thrAdded, ppBase, pfStride);
 
     constexpr IndexType Dimensions = FeatureTransformer::OutputDimensions;
 
