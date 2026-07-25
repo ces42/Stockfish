@@ -244,7 +244,7 @@ sf_always_inline inline void apply_threat_features(IndexType j,
 
 template<int sign, usize MaxLen, typename IdxType>
 sf_always_inline inline void apply_psqt(IndexType j,
-                                        vec_t psqt[Tiling::NumPsqtRegs],
+                                        psqt_vec_t psqt[Tiling::NumPsqtRegs],
                                         const ValueList<IdxType, MaxLen>& list,
                                         const PSQTWeightType* weights) {
     static_assert(sign == 1 || sign == -1);
