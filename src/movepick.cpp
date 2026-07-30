@@ -158,6 +158,7 @@ MovePicker::MovePicker(const Position&              p,
                        const CapturePieceToHistory* cph,
                        const PieceToHistory**       ch,
                        const SharedHistories*       sh,
+                       Move                         pom,
                        int                          pl) :
     pos(p),
     mainHistory(mh),
@@ -166,6 +167,7 @@ MovePicker::MovePicker(const Position&              p,
     continuationHistory(ch),
     sharedHistory(sh),
     ttMove(ttm),
+    previousOwnMove(pom),
     depth(d),
     ply(pl) {
 
@@ -182,6 +184,7 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
     pos(p),
     captureHistory(cph),
     ttMove(ttm),
+    previousOwnMove(),
     threshold(th) {
     assert(!pos.checkers());
 
@@ -247,6 +250,9 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
 
             if (ply < LOW_PLY_HISTORY_SIZE)
                 m.value += 8 * (*lowPlyHistory)[ply][m.raw()] / (1 + ply);
+
+            dbg_hit_on((from == previousOwnMove.to_sq_unchecked()) && (to == previousOwnMove.from_sq_unchecked()));
+            m.value -= 2048 * ((from == previousOwnMove.to_sq_unchecked()) && (to == previousOwnMove.from_sq_unchecked()));
         }
 
         else  // Type == EVASIONS

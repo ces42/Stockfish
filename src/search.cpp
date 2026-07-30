@@ -295,6 +295,7 @@ bool Search::Worker::iterative_deepening() {
           &continuationHistory[0][0][NO_PIECE][0];  // Use as a sentinel
         (ss - i)->continuationCorrectionHistory = &continuationCorrectionHistory[NO_PIECE][0];
         (ss - i)->staticEval                    = VALUE_NONE;
+        (ss - i)->currentMove                    = Move::none();
     }
 
     for (int i = 0; i <= MAX_PLY + 2; ++i)
@@ -1097,7 +1098,7 @@ moves_loop:  // When in check, search starts here
 
 
     MovePicker mp(pos, ttData.move, depth, &mainHistory, &lowPlyHistory, &captureHistory, contHist,
-                  &sharedHistory, ss->ply);
+                  &sharedHistory, (ss - 2)->currentMove, ss->ply);
 
     value = bestValue;
 
@@ -1738,7 +1739,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
     // the moves. We presently use two stages of move generator in quiescence search:
     // captures, or evasions only when in check.
     MovePicker mp(pos, ttData.move, DEPTH_QS, &mainHistory, &lowPlyHistory, &captureHistory,
-                  contHist, &sharedHistory, ss->ply);
+                  contHist, &sharedHistory, (ss - 2)->currentMove, ss->ply);
 
     // Step 5. Loop through all pseudo-legal moves until no moves remain or a beta
     // cutoff occurs.

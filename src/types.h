@@ -454,9 +454,17 @@ class Move {
         return Move(T + ((pt - KNIGHT) << 12) + (from << 6) + to);
     }
 
+    constexpr Square from_sq_unchecked() const {
+        return Square((data >> 6) & 0x3F);
+    }
+
     constexpr Square from_sq() const {
         assert(is_ok());
         return Square((data >> 6) & 0x3F);
+    }
+
+    constexpr Square to_sq_unchecked() const { 
+        return Square(data & 0x3F);
     }
 
     constexpr Square to_sq() const {
