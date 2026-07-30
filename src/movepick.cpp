@@ -251,8 +251,8 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
             if (ply < LOW_PLY_HISTORY_SIZE)
                 m.value += 8 * (*lowPlyHistory)[ply][m.raw()] / (1 + ply);
 
-            dbg_hit_on((from == previousOwnMove.to_sq_unchecked()) && (to == previousOwnMove.from_sq_unchecked()));
-            m.value -= 2048 * ((from == previousOwnMove.to_sq_unchecked()) && (to == previousOwnMove.from_sq_unchecked()));
+            // dbg_hit_on((from == previousOwnMove.to_sq_unchecked()) && (to == previousOwnMove.from_sq_unchecked()));
+            m.value -= 1024 * ((from == previousOwnMove.to_sq_unchecked()) && (to == previousOwnMove.from_sq_unchecked()));
         }
 
         else  // Type == EVASIONS
