@@ -98,8 +98,8 @@ void AccumulatorStack::evaluate(const Position&           pos,
     const usize last_white = find_last_usable_accumulator(WHITE);
     const usize last_black = find_last_usable_accumulator(BLACK);
 
-    if (accumulators[last_white].computed[WHITE] && accumulators[last_black].computed[BLACK])
-        forward_update_incremental_both(pos, featureTransformer, last_white, last_black);
+    if (last_white == last_black && accumulators[last_white].computed[WHITE] && accumulators[last_black].computed[BLACK])
+        forward_update_incremental_both(pos, featureTransformer, last_white);
     else
     {
         evaluate_side(WHITE, pos, featureTransformer, cache, last_white);
@@ -194,25 +194,14 @@ void AccumulatorStack::backward_update_incremental(Color                     per
 
 void AccumulatorStack::forward_update_incremental_both(const Position&           pos,
                                                        const FeatureTransformer& featureTransformer,
-                                                       usize                     white_begin,
-                                                       usize black_begin) noexcept {
+                                                       usize shared_begin) noexcept {
 
-    assert(white_begin < size);
-    assert(black_begin < size);
-    assert(accumulators[white_begin].computed[WHITE]);
-    assert(accumulators[black_begin].computed[BLACK]);
+    assert(shared_begin < size);
+    assert(accumulators[shared_begin].computed[WHITE]);
+    assert(accumulators[shared_begin].computed[BLACK]);
 
     const Square white_ksq    = pos.square<KING>(WHITE);
     const Square black_ksq    = pos.square<KING>(BLACK);
-    const usize  shared_begin = std::max(white_begin, black_begin);
-
-    // Catch up the lagging perspective, then traverse the common suffix once.
-    for (usize next = white_begin + 1; next <= shared_begin; ++next)
-        update_accumulator_incremental<true>(WHITE, featureTransformer, white_ksq,
-                                             accumulators[next], accumulators[next - 1]);
-    for (usize next = black_begin + 1; next <= shared_begin; ++next)
-        update_accumulator_incremental<true>(BLACK, featureTransformer, black_ksq,
-                                             accumulators[next], accumulators[next - 1]);
 
     for (usize next = shared_begin + 1; next < size; ++next)
         update_accumulator_incremental_both(featureTransformer, white_ksq, black_ksq,

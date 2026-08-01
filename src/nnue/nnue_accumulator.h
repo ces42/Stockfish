@@ -130,8 +130,7 @@ class AccumulatorStack {
 
     void forward_update_incremental_both(const Position&           pos,
                                          const FeatureTransformer& featureTransformer,
-                                         usize                     white_begin,
-                                         usize                     black_begin) noexcept;
+                                         usize                     shared_begin) noexcept;
 
     std::array<AccumulatorState, MaxSize> accumulators;
     usize                                 size = 1;
