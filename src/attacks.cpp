@@ -27,6 +27,8 @@ namespace Stockfish::Attacks {
 Bitboard LineBB[SQUARE_NB][SQUARE_NB];
 Bitboard BetweenBB[SQUARE_NB][SQUARE_NB];
 Bitboard RayPassBB[SQUARE_NB][SQUARE_NB];
+Bitboard DiagBB[SQUARE_NB];
+Bitboard AntiDiagBB[SQUARE_NB];
 
 namespace {
 
@@ -185,6 +187,22 @@ void init() {
                 }
                 BetweenBB[s1][s2] |= s2;
             }
+        
+        DiagBB[s1] = 0ULL;
+        AntiDiagBB[s1] = 0ULL;
+        int row = s1 / 8; int col = s1 % 8;
+        for (int r = row, c = col; r >= 0 && c >= 0; r--, c--) {
+            DiagBB[s1] |= square_bb(Square(r * 8 + c));
+        }
+        for (int r = row + 1, c = col + 1; r < 8 && c < 8; r++, c++) {
+            DiagBB[s1] |= square_bb(Square(r * 8 + c));
+        }
+        for (int r = row, c = col; r >= 0 && c < 8; r--, c++) {
+            AntiDiagBB[s1] |= square_bb(Square(r * 8 + c));
+        }
+        for (int r = row + 1, c = col - 1; r < 8 && c >= 0; r++, c--) {
+            AntiDiagBB[s1] |= square_bb(Square(r * 8 + c));
+        }
     }
 }
 

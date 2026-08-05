@@ -480,6 +480,18 @@ void Position::set_check_info() const {
     st->checkSquares[KING]   = 0;
 }
 
+void Position::set_threats() const {
+    st->threats[PAWN] = attacks_by<PAWN>(~sideToMove);
+    st->threats[KNIGHT] = attacks_by<KNIGHT>(~sideToMove);
+    st->threats[BISHOP] = attacks_by<BISHOP>(~sideToMove);
+    st->threats[ROOK] = attacks_by<ROOK>(~sideToMove);
+    st->threats[QUEEN] = attacks_by<QUEEN>(~sideToMove);
+    st->threats[KING] = attacks_by<KING>(~sideToMove);
+    st->threats[ALL_PIECES] =
+      st->threats[PAWN] | st->threats[KNIGHT] | st->threats[BISHOP] | 
+      st->threats[ROOK] | st->threats[QUEEN]  | st->threats[KING];
+}
+
 
 // Computes the hash keys of the position, and other
 // data that once computed is updated incrementally as moves are made.
@@ -494,6 +506,7 @@ void Position::set_state() const {
     st->checkersBB = attackers_to(square<KING>(sideToMove)) & pieces(~sideToMove);
 
     set_check_info();
+    set_threats();
 
     for (Bitboard b = pieces(); b;)
     {
@@ -680,7 +693,7 @@ bool Position::legal(Move m) const {
         Direction step = to > from ? WEST : EAST;
 
         for (Square s = to; s != from; s += step)
-            if (attackers_to_exist(s, pieces(), ~us))
+            if (is_threatened(s))
                 return false;
 
         // In case of Chess960, verify if the Rook blocks some checks.
@@ -1050,6 +1063,8 @@ void Position::do_move(Move                      m,
     // Update king attacks used for fast check detection
     set_check_info();
 
+    set_threats();
+
     // Calculate the repetition info. It is the ply distance from the previous
     // occurrence of the same position, negative in the 3-fold case, or zero
     // if the position was not repeated.
@@ -1391,6 +1406,8 @@ void Position::do_null_move(StateInfo& newSt) {
     sideToMove = ~sideToMove;
 
     set_check_info();
+
+    set_threats();
 
     st->repetition = 0;
 
