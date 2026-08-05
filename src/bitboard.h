@@ -63,6 +63,9 @@ constexpr Bitboard Rank6BB = Rank1BB << (8 * 5);
 constexpr Bitboard Rank7BB = Rank1BB << (8 * 6);
 constexpr Bitboard Rank8BB = Rank1BB << (8 * 7);
 
+constexpr Bitboard MainDiagonal     = 0x8040201008040201ULL;
+constexpr Bitboard MainAntiDiagonal = 0x0102040810204080ULL;
+
 constexpr Bitboard square_bb(Square s) {
     assert(is_ok(s));
     return 1ULL << s;
@@ -98,6 +101,17 @@ constexpr Bitboard file_bb(File f) { return FileABB << f; }
 
 constexpr Bitboard file_bb(Square s) { return file_bb(file_of(s)); }
 
+inline Bitboard diag_bb(Square s) {
+    int offset = file_of(s) - rank_of(s);
+    Bitboard column_mask = ((Rank2BB >> (8 - offset)) & Rank1BB) * FileABB;
+    return std::__rotl(MainDiagonal, offset) & column_mask;
+}
+
+inline Bitboard antidiag_bb(Square s) {
+    int offset = file_of(s) + rank_of(s) - 7;
+    Bitboard column_mask = ((Rank2BB >> (8 - offset)) & Rank1BB) * FileABB;
+    return std::__rotl(MainAntiDiagonal, offset) & column_mask;
+}
 
 // Moves a bitboard one or two steps as specified by the direction D
 inline constexpr Bitboard shift(Bitboard b, Direction dir) {

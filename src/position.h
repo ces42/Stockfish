@@ -62,6 +62,7 @@ struct StateInfo {
     Bitboard   blockersForKing[COLOR_NB];
     Bitboard   pinners[COLOR_NB];
     Bitboard   checkSquares[PIECE_TYPE_NB];
+    Bitboard   threats[PIECE_TYPE_NB];
     Piece      capturedPiece;
     int        repetition;
 };
@@ -132,10 +133,10 @@ class Position {
     void     update_slider_blockers(Color c) const;
     template<PieceType Pt>
     Bitboard attacks_by(Color c) const;
+    Bitboard threats_by(PieceType pt) const;
 
     // Properties of moves
     bool  legal(Move m) const;
-    bool  pseudo_legal(const Move m) const;
     bool  capture(Move m) const;
     bool  capture_stage(Move m) const;
     bool  gives_check(Move m) const;
@@ -194,7 +195,8 @@ class Position {
     void set_castling_right(Color c, Square rfrom);
     Key  compute_material_key() const;
     void set_state() const;
-    void set_check_info() const;
+    void set_extra_bitboards() const;
+    void set_threats() const;
 
     // Other helpers
     template<bool ComputeRay = true>
@@ -307,6 +309,8 @@ inline Bitboard Position::attacks_by(Color c) const {
         return threats;
     }
 }
+
+inline Bitboard Position::threats_by(PieceType pt) const { return st->threats[pt]; }
 
 inline Bitboard Position::checkers() const { return st->checkersBB; }
 
