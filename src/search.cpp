@@ -1054,7 +1054,7 @@ Value Search::Worker::search(
         {
             assert(move.is_ok());
 
-            if (move == excludedMove || !pos.legal(move))
+            if (move == excludedMove)
                 continue;
 
             assert(pos.capture_stage(move));
@@ -1103,17 +1103,13 @@ moves_loop:  // When in check, search starts here
 
     int moveCount = 0;
 
-    // Step 13. Loop through all pseudo-legal moves until no moves remain
+    // Step 13. Loop through all legal moves until no moves remain
     // or a beta cutoff occurs.
     while ((move = mp.next_move()) != Move::none())
     {
         assert(move.is_ok());
 
         if (move == excludedMove)
-            continue;
-
-        // Check for legality
-        if (!pos.legal(move))
             continue;
 
         // At root obey the "searchmoves" option and skip moves not listed in Root
@@ -1745,14 +1741,11 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
     MovePicker mp(pos, ttData.move, DEPTH_QS, &mainHistory, &lowPlyHistory, &captureHistory,
                   contHist, &sharedHistory, ss->ply);
 
-    // Step 5. Loop through all pseudo-legal moves until no moves remain or a beta
+    // Step 5. Loop through all legal moves until no moves remain or a beta
     // cutoff occurs.
     while ((move = mp.next_move()) != Move::none())
     {
         assert(move.is_ok());
-
-        if (!pos.legal(move))
-            continue;
 
         givesCheck = pos.gives_check(move);
         capture    = pos.capture_stage(move);
