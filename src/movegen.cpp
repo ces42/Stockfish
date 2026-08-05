@@ -208,19 +208,27 @@ Move* generate_moves(const Position& pos, Move* moveList, Bitboard target) {
         bb &= ~pinned;
     }
 
-    while (bb)
-    {
-        Square   from = pop_lsb(bb);
-        Bitboard b    = Attacks::attacks_bb<Pt>(from, pos.pieces()) & target;
+    if (pinned & bb && Pt != KNIGHT) {
+        while (bb)
+        {
+            Square   from = pop_lsb(bb);
+            Bitboard b    = Attacks::attacks_bb<Pt>(from, pos.pieces()) & target;
 
-        if constexpr (Pt != KNIGHT) {
             if (pinned & from) {
                 b &= Attacks::line_bb(from, ksq);
             }
-        }
 
-        moveList = splat_moves(moveList, from, b);
+            moveList = splat_moves(moveList, from, b);
+        }
     }
+    else
+        while (bb)
+        {
+            Square   from = pop_lsb(bb);
+            Bitboard b    = Attacks::attacks_bb<Pt>(from, pos.pieces()) & target;
+
+            moveList = splat_moves(moveList, from, b);
+        }
 
     return moveList;
 }
