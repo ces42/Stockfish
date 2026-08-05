@@ -170,10 +170,10 @@ MovePicker::MovePicker(const Position&              p,
     ply(pl) {
 
     if (pos.checkers())
-        stage = EVASION_TT + !(ttm && pos.pseudo_legal(ttm) && pos.legal(ttm));
+        stage = EVASION_TT + !(ttm && pos.legal(ttm));
 
     else
-        stage = (depth > 0 ? MAIN_TT : QSEARCH_TT) + !(ttm && pos.pseudo_legal(ttm) && pos.legal(ttm));
+        stage = (depth > 0 ? MAIN_TT : QSEARCH_TT) + !(ttm && pos.legal(ttm));
 }
 
 // MovePicker constructor for ProbCut: we generate captures with Static Exchange
@@ -185,7 +185,7 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
     threshold(th) {
     assert(!pos.checkers());
 
-    stage = PROBCUT_TT + !(ttm && pos.capture_stage(ttm) && pos.pseudo_legal(ttm) && pos.legal(ttm));
+    stage = PROBCUT_TT + !(ttm && pos.capture_stage(ttm) && pos.legal(ttm));
 }
 
 // Assigns a numerical value to each move in a list, used for sorting.
