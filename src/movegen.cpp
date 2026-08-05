@@ -279,17 +279,11 @@ Move* generate_all(const Position& pos, Move* moveList) {
                 Square from = ksq;
                 Square rookSquare = pos.castling_rook_square(cr);
                 Square to = relative_square(Us, rookSquare > ksq ? SQ_G1 : SQ_C1);
-                Direction step = to > ksq ? WEST : EAST;
 
-                bool legal = true;
-                for (Square s = to; s != from; s += step) {
-                    if (pos.is_threatened(s)) {
-                        legal = false;
-                        break;
-                    }
-                }
+                // assert(!(Attacks::between_bb(from, to) & to));
+                bool illegal = Attacks::between_bb(from, to) & pos.threats_by<ALL_PIECES>();
 
-                if (!legal || (pos.is_chess960() && (pos.blockers_for_king(Us) & rookSquare))) {
+                if (illegal || (pos.is_chess960() && (pos.blockers_for_king(Us) & rookSquare))) {
                     continue;
                 }
 
