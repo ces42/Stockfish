@@ -259,15 +259,13 @@ Move* generate_all(const Position& pos, Move* moveList) {
 
     if constexpr (Type == EVASIONS) {
         target = ~pos.pieces(Us);
-    }
 
-    Bitboard slidingCheckers = pos.checkers() &
-      (pos.pieces(~Us, BISHOP) | pos.pieces(~Us, ROOK) | pos.pieces(~Us, QUEEN));
-    Bitboard bb = slidingCheckers;
-    while (bb) {
-        target &= ~Attacks::line_bb(ksq, pop_lsb(bb));
+        Bitboard slidingCheckers = pos.checkers() &
+          (pos.pieces(~Us, BISHOP) | pos.pieces(~Us, ROOK) | pos.pieces(~Us, QUEEN));
+        while (slidingCheckers)
+            target &= ~Attacks::ray_pass_bb(pop_lsb(slidingCheckers), ksq);
+
     }
-    target |= slidingCheckers;
     target &= ~pos.threats_by<ALL_PIECES>();
 
     Bitboard b = Attacks::attacks_bb<KING>(ksq) & target;

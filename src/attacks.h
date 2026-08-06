@@ -186,6 +186,7 @@ inline Bitboard between_bb(Square s1, Square s2) {
     return BetweenBB[s1][s2];
 }
 
+// ray going from s1 to s2 and past, excluding s1
 inline Bitboard ray_pass_bb(Square s1, Square s2) {
     assert(is_ok(s1) && is_ok(s2));
     return RayPassBB[s1][s2];
