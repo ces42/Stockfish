@@ -202,33 +202,27 @@ Move* generate_moves(const Position& pos, Move* moveList, Bitboard target) {
 
     const Square ksq = pos.square<KING>(Us);
     const Bitboard pinned = pos.blockers_for_king(Us);
-    Bitboard bb = pos.pieces(Us, Pt);
 
-    if constexpr (Pt == KNIGHT) {
-        bb &= ~pinned;
+    Bitboard bb = pos.pieces(Us, Pt) & ~pinned;
+    while (bb)
+    {
+        Square   from = pop_lsb(bb);
+        Bitboard b    = Attacks::attacks_bb<Pt>(from, pos.pieces()) & target;
+
+        moveList = splat_moves(moveList, from, b);
     }
 
-    if (pinned & bb && Pt != KNIGHT) {
+    if constexpr (Pt != KNIGHT) {
+        bb = pos.pieces(Us, Pt) & pinned;
         while (bb)
         {
             Square   from = pop_lsb(bb);
             Bitboard b    = Attacks::attacks_bb<Pt>(from, pos.pieces()) & target;
-
-            if (pinned & from) {
-                b &= Attacks::line_bb(from, ksq);
-            }
+            b &= Attacks::line_bb(ksq, from);
 
             moveList = splat_moves(moveList, from, b);
         }
     }
-    else
-        while (bb)
-        {
-            Square   from = pop_lsb(bb);
-            Bitboard b    = Attacks::attacks_bb<Pt>(from, pos.pieces()) & target;
-
-            moveList = splat_moves(moveList, from, b);
-        }
 
     return moveList;
 }
@@ -266,7 +260,6 @@ Move* generate_all(const Position& pos, Move* moveList) {
         while (bb) {
             target &= ~Attacks::ray_pass_bb(pop_lsb(bb), ksq);
         }
-        // target |= slidingCheckers;
     }
     target &= ~pos.threats_by<ALL_PIECES>();
 
