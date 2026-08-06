@@ -273,7 +273,6 @@ Move* generate_all(const Position& pos, Move* moveList) {
                 Square rookSquare = pos.castling_rook_square(cr);
                 Square to = relative_square(Us, rookSquare > ksq ? SQ_G1 : SQ_C1);
 
-                // assert(!(Attacks::between_bb(from, to) & to));
                 bool illegal = Attacks::between_bb(from, to) & pos.threats_by<ALL_PIECES>();
 
                 if (illegal || (pos.is_chess960() && (pos.blockers_for_king(Us) & rookSquare))) {

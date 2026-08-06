@@ -187,7 +187,7 @@ void init() {
                 }
                 BetweenBB[s1][s2] |= s2;
             }
-        
+
         DiagBB[s1] = 0ULL;
         AntiDiagBB[s1] = 0ULL;
         int row = s1 / 8; int col = s1 % 8;
