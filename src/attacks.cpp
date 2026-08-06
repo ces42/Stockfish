@@ -188,21 +188,12 @@ void init() {
                 BetweenBB[s1][s2] |= s2;
             }
 
-        DiagBB[s1] = 0ULL;
-        AntiDiagBB[s1] = 0ULL;
-        int row = s1 / 8; int col = s1 % 8;
-        for (int r = row, c = col; r >= 0 && c >= 0; r--, c--) {
-            DiagBB[s1] |= square_bb(Square(r * 8 + c));
-        }
-        for (int r = row + 1, c = col + 1; r < 8 && c < 8; r++, c++) {
-            DiagBB[s1] |= square_bb(Square(r * 8 + c));
-        }
-        for (int r = row, c = col; r >= 0 && c < 8; r--, c++) {
-            AntiDiagBB[s1] |= square_bb(Square(r * 8 + c));
-        }
-        for (int r = row + 1, c = col - 1; r < 8 && c >= 0; r++, c--) {
-            AntiDiagBB[s1] |= square_bb(Square(r * 8 + c));
-        }
+        DiagBB[s1] =     s1 == SQ_H1 || s1 == SQ_A8 ? square_bb(s1)
+                         : (Rank8BB | FileHBB) & s1 ? line_bb(s1, Square(s1 - 9))
+                                                    : line_bb(s1, Square(s1 + 9));
+        AntiDiagBB[s1] = s1 == SQ_A1 || s1 == SQ_H8 ? square_bb(s1)
+                         : (Rank8BB | FileABB) & s1 ? line_bb(s1, Square(s1 - 7))
+                                                    : line_bb(s1, Square(s1 + 7));
     }
 }
 
