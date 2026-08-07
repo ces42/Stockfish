@@ -83,22 +83,10 @@ inline Move* splat_moves(Move* moveList, Square from, Bitboard to_bb) {
 
 #endif
 
-template<GenType Type, Direction D, bool Enemy>
-Move* make_promotions(Move* moveList, [[maybe_unused]] Square to) {
-
-    constexpr bool          all  = Type == EVASIONS || Type == NON_EVASIONS;
-    [[maybe_unused]] Square from = to - D;
-
-    if constexpr (Type == CAPTURES || all)
-        *moveList++ = Move::make<PROMOTION>(from, to, QUEEN);
-
-    if constexpr ((Type == CAPTURES && Enemy) || (Type == QUIETS && !Enemy) || all)
-    {
-        *moveList++ = Move::make<PROMOTION>(from, to, ROOK);
-        *moveList++ = Move::make<PROMOTION>(from, to, BISHOP);
-        *moveList++ = Move::make<PROMOTION>(from, to, KNIGHT);
-    }
-
+template<Direction D>
+Move* make_promotions(Move* moveList, Square to) {
+    Square from = to - D;
+    *moveList++ = Move::make<PROMOTION>(from, to, QUEEN);
     return moveList;
 }
 
@@ -135,8 +123,8 @@ Move* generate_pawn_moves(const Position& pos, Move* moveList, Bitboard target) 
         moveList = splat_pawn_moves<Up + Up>(moveList, b2);
     }
 
-    // Promotions and underpromotions
-    if (pawnsOn7)
+    // Promotions
+    if (Type != QUIETS && pawnsOn7)
     {
         Bitboard b1 = shift<UpRight>(pawnsOn7) & enemies;
         Bitboard b2 = shift<UpLeft>(pawnsOn7) & enemies;
@@ -146,13 +134,13 @@ Move* generate_pawn_moves(const Position& pos, Move* moveList, Bitboard target) 
             b3 &= target;
 
         while (b1)
-            moveList = make_promotions<Type, UpRight, true>(moveList, pop_lsb(b1));
+            moveList = make_promotions<UpRight>(moveList, pop_lsb(b1));
 
         while (b2)
-            moveList = make_promotions<Type, UpLeft, true>(moveList, pop_lsb(b2));
+            moveList = make_promotions<UpLeft>(moveList, pop_lsb(b2));
 
         while (b3)
-            moveList = make_promotions<Type, Up, false>(moveList, pop_lsb(b3));
+            moveList = make_promotions<Up>(moveList, pop_lsb(b3));
     }
 
     // Standard and en passant captures
