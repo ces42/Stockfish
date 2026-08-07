@@ -644,6 +644,23 @@ Move UCIEngine::to_move(const Position& pos, std::string str) {
         if (str == move(m, pos.is_chess960()))
             return m;
 
+    // parse underpromo
+    if (str.size() == 5){
+        PieceType pt;
+        switch (str[4]) {
+            case 'n': pt = KNIGHT; break;
+            case 'b': pt = BISHOP; break;
+            case 'r': pt = ROOK; break;
+            default: assert(false); return Move::none();
+        }
+        Square from = Square( str[0] - 'a' + 8 * (str[1] - '1') );
+        Square to = Square( str[2] - 'a' +  8 * (str[3] - '1') );
+        Move mov = Move::make<PROMOTION>(from, to, pt);
+        if (pos.legal(mov))
+            return mov;
+    }
+
+    assert(false);
     return Move::none();
 }
 
