@@ -718,8 +718,6 @@ bool Position::legal(Move m) const {
         return false;
 
 
-    // If the moving piece is a king, check whether the destination square is
-    // attacked by the opponent.
     if (type_of(piece_on(from)) != KING)
     {
         if (checkers())
@@ -732,11 +730,13 @@ bool Position::legal(Move m) const {
             if (!(between_bb(square<KING>(us), lsb(checkers())) & to))
                 return false;
         }
-        // A non-king move is legal if and only if it is not pinned or it
-        // is moving along the ray towards or away from the king.
+        // When not in check, a non-king move is legal if and only if it is not pinned
+        // or it is moving along the ray towards or away from the king.
         return !(blockers_for_king(us) & from) || line_bb(from, to) & pieces(us, KING);
     }
     else
+        // If the moving piece is a king, check whether the destination square is
+        // attacked by the opponent.
         return !(attackers_to_exist(to, pieces() ^ from, ~us));
 }
 
