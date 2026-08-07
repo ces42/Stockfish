@@ -682,8 +682,7 @@ bool Position::legal(Move m) const {
 
     // Use a slower but simpler function for uncommon cases
     if (m.type_of() != NORMAL)
-        return checkers() ? MoveList<EVASIONS>(*this).contains(m)
-                          : MoveList<NON_EVASIONS>(*this).contains(m);
+        return MoveList<LEGAL>(*this).contains(m);
 
     // Is not a promotion, so the promotion piece must be empty
     assert(m.promotion_type() - KNIGHT == NO_PIECE_TYPE);
