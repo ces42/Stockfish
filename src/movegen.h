@@ -32,7 +32,6 @@ enum GenType {
     CAPTURES,
     QUIETS,
     EVASIONS,
-    NON_EVASIONS,
     LEGAL
 };
 

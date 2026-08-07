@@ -86,7 +86,7 @@ inline Move* splat_moves(Move* moveList, Square from, Bitboard to_bb) {
 template<GenType Type, Direction D, bool Enemy>
 Move* make_promotions(Move* moveList, [[maybe_unused]] Square to) {
 
-    constexpr bool          all  = Type == EVASIONS || Type == NON_EVASIONS;
+    constexpr bool          all  = Type == EVASIONS;
     [[maybe_unused]] Square from = to - D;
 
     if constexpr (Type == CAPTURES || all)
@@ -162,7 +162,7 @@ Move* generate_pawn_moves(const Position& pos, Move* moveList, Bitboard target) 
     }
 
     // Standard and en passant captures
-    if constexpr (Type == CAPTURES || Type == EVASIONS || Type == NON_EVASIONS)
+    if constexpr (Type == CAPTURES || Type == EVASIONS)
     {
         Bitboard b1 = shift<UpRight>(pawnsNotOn7 & canCaptureRight) & enemies;
         Bitboard b2 = shift<UpLeft>(pawnsNotOn7 & canCaptureLeft) & enemies;
@@ -240,7 +240,6 @@ Move* generate_all(const Position& pos, Move* moveList, Color us) {
     if (Type != EVASIONS || !more_than_one(pos.checkers()))
     {
         target = Type == EVASIONS     ? Attacks::between_bb(ksq, lsb(pos.checkers()))
-               : Type == NON_EVASIONS ? ~pos.pieces(us)
                : Type == CAPTURES     ? pos.pieces(~us)
                                       : ~pos.pieces();  // QUIETS
 
@@ -265,7 +264,7 @@ Move* generate_all(const Position& pos, Move* moveList, Color us) {
     Bitboard b = Attacks::attacks_bb<KING>(ksq) & target;
     moveList = splat_moves(moveList, ksq, b);
 
-    if ((Type == QUIETS || Type == NON_EVASIONS) && pos.can_castle(us & ANY_CASTLING)) {
+    if (Type == QUIETS && pos.can_castle(us & ANY_CASTLING)) {
         for (CastlingRights cr : {us & KING_SIDE, us & QUEEN_SIDE}) {
             if (!pos.castling_impeded(cr) && pos.can_castle(cr)) {
                 Square from = ksq;
@@ -292,7 +291,6 @@ Move* generate_all(const Position& pos, Move* moveList, Color us) {
 // <CAPTURES>     Generates all legal captures plus queen promotions
 // <QUIETS>       Generates all legal non-captures and underpromotions
 // <EVASIONS>     Generates all legal check evasions
-// <NON_EVASIONS> Generates all legal captures and non-captures
 //
 // Returns a pointer to the end of the move list.
 template<GenType Type>
@@ -310,15 +308,14 @@ Move* generate(const Position& pos, Move* moveList) {
 template Move* generate<CAPTURES>(const Position&, Move*);
 template Move* generate<QUIETS>(const Position&, Move*);
 template Move* generate<EVASIONS>(const Position&, Move*);
-template Move* generate<NON_EVASIONS>(const Position&, Move*);
 
 // generate<LEGAL> generates all the legal moves in the given position
 
 template<>
 Move* generate<LEGAL>(const Position& pos, Move* moveList) {
-    moveList =
-      pos.checkers() ? generate<EVASIONS>(pos, moveList) : generate<NON_EVASIONS>(pos, moveList);
-    return moveList;
+    return pos.checkers() ? generate<EVASIONS>(pos, moveList)
+                          : generate<QUIETS>(pos, generate<CAPTURES>(pos, moveList));
+
 }
 
 }  // namespace Stockfish

@@ -180,7 +180,7 @@ inline Bitboard line_bb(Square s1, Square s2) {
 }
 
 // horizontal/vertical/diagonal line segment from s1 to s2, 
-// excluding s1 and s2
+// excluding s1 but including s2
 inline Bitboard between_bb(Square s1, Square s2) {
     assert(is_ok(s1) && is_ok(s2));
     return BetweenBB[s1][s2];
