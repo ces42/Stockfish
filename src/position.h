@@ -380,7 +380,7 @@ inline bool Position::capture_stage(Move m) const {
         return !empty(m.to_sq());
 
     if (mt == PROMOTION)
-        return !empty(m.to_sq()) || m.promotion_type() == QUEEN;
+        return m.promotion_type() == QUEEN;
 
     return mt == EN_PASSANT;
 }
