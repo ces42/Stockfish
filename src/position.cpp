@@ -481,12 +481,12 @@ void Position::set_check_info() const {
 }
 
 void Position::set_threats() const {
-    st->threats[PAWN] = attacks_by<PAWN>(~sideToMove);
-    st->threats[KNIGHT] = attacks_by<KNIGHT>(~sideToMove);
-    st->threats[BISHOP] = attacks_by<BISHOP>(~sideToMove);
-    st->threats[ROOK] = attacks_by<ROOK>(~sideToMove);
-    st->threats[QUEEN] = attacks_by<QUEEN>(~sideToMove);
-    st->threats[KING] = attacks_by<KING>(~sideToMove);
+    st->threats[PAWN] = xattacks_by<PAWN>(~sideToMove);
+    st->threats[KNIGHT] = xattacks_by<KNIGHT>(~sideToMove);
+    st->threats[BISHOP] = xattacks_by<BISHOP>(~sideToMove);
+    st->threats[ROOK] = xattacks_by<ROOK>(~sideToMove);
+    st->threats[QUEEN] = xattacks_by<QUEEN>(~sideToMove);
+    st->threats[KING] = xattacks_by<KING>(~sideToMove);
     st->threats[ALL_PIECES] =
       st->threats[PAWN] | st->threats[KNIGHT] | st->threats[BISHOP] | 
       st->threats[ROOK] | st->threats[QUEEN]  | st->threats[KING];

@@ -250,16 +250,9 @@ Move* generate_all(const Position& pos, Move* moveList, Color us) {
         moveList = generate_moves<QUEEN>(pos, moveList, target, us);
     }
 
-    if constexpr (Type == EVASIONS) {
+    if constexpr (Type == EVASIONS)
         target = ~pos.pieces(us);
 
-        Bitboard slidingCheckers = pos.checkers() &
-          (pos.pieces(~us, BISHOP) | pos.pieces(~us, ROOK) | pos.pieces(~us, QUEEN));
-        Bitboard bb = slidingCheckers;
-        while (bb) {
-            target &= ~Attacks::ray_pass_bb(pop_lsb(bb), ksq);
-        }
-    }
     target &= ~pos.threats_by<ALL_PIECES>();
 
     Bitboard b = Attacks::attacks_bb<KING>(ksq) & target;
