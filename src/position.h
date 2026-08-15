@@ -135,7 +135,6 @@ class Position {
     Bitboard attacks_by(Color c) const;
     template<PieceType Pt>
     Bitboard threats_by() const;
-    bool is_threatened(Square s) const;
 
     // Properties of moves
     bool  legal(Move m) const;
@@ -314,8 +313,6 @@ inline Bitboard Position::attacks_by(Color c) const {
 
 template<PieceType Pt>
 inline Bitboard Position::threats_by() const { return st->threats[Pt]; }
-
-inline bool Position::is_threatened(Square s) const { return bool(threats_by<ALL_PIECES>() & s); }
 
 inline Bitboard Position::checkers() const { return st->checkersBB; }
 
