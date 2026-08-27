@@ -83,6 +83,7 @@ class TranspositionTable {
 
     void resize(usize mbSize, ThreadPool& threads);  // Set TT size in MiB
     void clear(ThreadPool& threads);                 // Re-initialize memory, multithreaded
+    usize size();
 
     void
     new_search();  // This must be called at the beginning of each root search to track entry aging

@@ -161,9 +161,9 @@ struct Cluster {
 static_assert(sizeof(Cluster) == 32, "Suboptimal Cluster size");
 
 
-// Sets the size of the transposition table,
-// measured in megabytes. Transposition table consists
-// of clusters and each cluster consists of ClusterSize number of TTEntry.
+// Sets the size of the transposition table, measured in megabytes.
+// Transposition table consists of clusters and each cluster consists of
+// ClusterSize number of TTEntry.
 void TranspositionTable::resize(usize mbSize, ThreadPool& threads) {
     aligned_large_pages_free(table);
 
@@ -185,9 +185,14 @@ void TranspositionTable::resize(usize mbSize, ThreadPool& threads) {
     clear(threads);
 }
 
+// returns the size of the transposition table, measured in megabytes
+usize TranspositionTable::size() {
+    assert(clusterCount * sizeof(Cluster) % (1024 * 1024) == 0);
+    return clusterCount * sizeof(Cluster) / (1024 * 1024);
+}
 
-// Initializes the entire transposition table to zero,
-// in a multi-threaded way.
+
+// Initializes the entire transposition table to zero, in a multi-threaded way
 void TranspositionTable::clear(ThreadPool& threads) {
     generation8             = 0;
     const usize threadCount = threads.num_threads();
