@@ -222,6 +222,8 @@ void ThreadPool::set(const NumaConfig&                           numaConfig,
         auto threadsPerNode = counts;
         counts.clear();
 
+        assert(threads.size() == 0);
+
         while (threads.size() < requested)
         {
             const usize     threadId      = threads.size();
@@ -240,8 +242,8 @@ void ThreadPool::set(const NumaConfig&                           numaConfig,
                                                        : OptionalThreadToNumaNodeBinder(numaId);
 
                 threads.emplace_back(std::make_unique<Thread>(sharedState, std::move(manager),
-                                                                         threadId, counts[numaId]++,
-                                                                         threadsPerNode[numaId], binder));
+                                                              threadId, counts[numaId]++,
+                                                              threadsPerNode[numaId], binder));
             };
 
             // Ensure the worker thread inherits the intended NUMA affinity at creation.
@@ -250,8 +252,6 @@ void ThreadPool::set(const NumaConfig&                           numaConfig,
             else
                 create_thread();
         }
-
-        clear();
 
         main_thread()->wait_for_search_finished();
     }
