@@ -95,6 +95,72 @@ constexpr usize SimdWidth = 16;
 
 constexpr usize MaxSimdWidth = 32;
 
+#if defined(USE_AVX2)
+
+// Information needed to decode six signed LEB128 integers of at most two bytes each.
+// The low byte is an index into the shuffle/sign tables and the high byte is the
+// number of input bytes consumed. A zero entry denotes an unsupported byte pattern.
+alignas(CacheLineSize) inline constexpr auto Leb128ChunkInfo = []() {
+    std::array<u16, 1 << 12> table{};
+
+    for (u32 mask = 0; mask < table.size(); ++mask)
+    {
+        u32  pos = 0, control = 0;
+        bool valid = true;
+
+        for (u32 value = 0; value < 6; ++value)
+        {
+            if (mask & (u32(1) << pos))
+            {
+                if (pos + 1 >= 12 || (mask & (u32(1) << (pos + 1))))
+                {
+                    valid = false;
+                    break;
+                }
+
+                control |= u32(1) << value;
+                pos += 2;
+            }
+            else
+                ++pos;
+        }
+
+        if (valid)
+            table[mask] = u16((pos << 8) | control);
+    }
+
+    return table;
+}();
+
+struct alignas(32) Leb128DecodeControl {
+    std::array<u8, 16> shuffle;
+    std::array<i16, 8> sign;
+};
+
+alignas(CacheLineSize) inline constexpr auto Leb128DecodeControls = []() {
+    std::array<Leb128DecodeControl, 64> table{};
+
+    for (u32 control = 0; control < table.size(); ++control)
+    {
+        for (u32 byte = 0; byte < table[control].shuffle.size(); ++byte)
+            table[control].shuffle[byte] = 0x80;
+        u8 pos = 0;
+
+        for (u32 value = 0; value < 6; ++value)
+        {
+            table[control].shuffle[2 * value] = pos++;
+            if (control & (u32(1) << value))
+                table[control].shuffle[2 * value + 1] = pos++;
+
+            table[control].sign[value] = (control & (u32(1) << value)) ? i16(0x2000) : i16(0x40);
+        }
+    }
+
+    return table;
+}();
+
+#endif
+
 // Type of input feature after conversion
 using TransformedFeatureType = u8;
 
@@ -216,6 +282,56 @@ inline void read_leb_128_detail(std::istream& stream,
                 return;
             }
         }
+
+#if defined(USE_AVX2)
+        if constexpr (std::is_same_v<IntType, i16>)
+        {
+            if (shift == 0 && Count - i >= 8 && buf_end - buf_pos >= 16)
+            {
+                const __m128i bytes =
+                  _mm_loadu_si128(reinterpret_cast<const __m128i*>(&buf[buf_pos]));
+                const u32 continuationMask = u32(_mm_movemask_epi8(bytes));
+
+                if ((continuationMask & 0xFF) == 0)
+                {
+                    const __m128i signedBytes =
+                      _mm_sub_epi8(_mm_xor_si128(bytes, _mm_set1_epi8(0x40)), _mm_set1_epi8(0x40));
+                    const __m128i values = _mm_cvtepi8_epi16(signedBytes);
+                    _mm_storeu_si128(reinterpret_cast<__m128i*>(&out[i]), values);
+
+                    i += 8;
+                    buf_pos += 8;
+                    bytes_left -= 8;
+                    continue;
+                }
+
+                const u16 chunkInfo = Leb128ChunkInfo[continuationMask & 0xFFF];
+                if (chunkInfo != 0)
+                {
+                    const u32     control  = chunkInfo & 0xFF;
+                    const u32     consumed = chunkInfo >> 8;
+                    const __m128i shuffle  = _mm_load_si128(reinterpret_cast<const __m128i*>(
+                      Leb128DecodeControls[control].shuffle.data()));
+                    const __m128i sign     = _mm_load_si128(
+                      reinterpret_cast<const __m128i*>(Leb128DecodeControls[control].sign.data()));
+                    const __m128i shuffled = _mm_shuffle_epi8(bytes, shuffle);
+                    const __m128i values   = _mm_or_si128(
+                      _mm_and_si128(shuffled, _mm_set1_epi16(0x7F)),
+                      _mm_srli_epi16(_mm_and_si128(shuffled, _mm_set1_epi16(0x7F00)), 1));
+                    const __m128i signedValues = _mm_sub_epi16(_mm_xor_si128(values, sign), sign);
+
+                    _mm_storel_epi64(reinterpret_cast<__m128i*>(&out[i]), signedValues);
+                    const u32 lastTwo = u32(_mm_extract_epi32(signedValues, 2));
+                    std::memcpy(&out[i + 4], &lastTwo, sizeof(lastTwo));
+
+                    i += 6;
+                    buf_pos += consumed;
+                    bytes_left -= consumed;
+                    continue;
+                }
+            }
+        }
+#endif
 
         u8 byte = buf[buf_pos++];
         --bytes_left;
