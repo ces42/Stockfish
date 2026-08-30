@@ -95,7 +95,7 @@ constexpr usize SimdWidth = 16;
 
 constexpr usize MaxSimdWidth = 32;
 
-#if defined(USE_AVX2)
+#if defined(USE_AVX2) || defined(USE_SSE41)
 
 // Information needed to decode six signed LEB128 integers of at most two bytes each.
 // The low byte is an index into the shuffle/sign tables and the high byte is the
@@ -283,7 +283,7 @@ inline void read_leb_128_detail(std::istream& stream,
             }
         }
 
-#if defined(USE_AVX2)
+#if defined(USE_AVX2) || defined(USE_SSE41)
         if constexpr (std::is_same_v<IntType, i16>)
         {
             if (shift == 0 && Count - i >= 8 && buf_end - buf_pos >= 16)
