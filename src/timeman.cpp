@@ -130,6 +130,10 @@ void TimeManagement::init(Search::LimitsType& limits,
         maxScale = 1.3 + 0.11 * mtg;
     }
 
+    double timeAdvantage =
+      (limits.time[us] - limits.time[~us]) / (1.0 + limits.time[us] + limits.time[~us]);
+    optScale *= 1 + 0.9 * std::min(timeAdvantage, 0.0);
+
     // Limit the maximum possible time for this move
     optimumTime = TimePoint(std::max(1.0, optScale * timeLeft));
     maximumTime =
