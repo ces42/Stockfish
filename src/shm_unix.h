@@ -26,6 +26,7 @@
 #include <cstring>
 #include <cstdio>
 #include <dirent.h>
+#include <functional>
 #include <mutex>
 #include <new>
 #include <optional>
@@ -207,6 +208,9 @@ class SharedMemory {
     static_assert(!std::is_pointer_v<T>, "T cannot be a pointer type");
 
    private:
+    using Initializer = std::function<void(T&)>;
+    using Namer       = std::function<std::string(const T&)>;
+
     std::string name_;
     void*       mapped_ptr_ = nullptr;
     T*          data_ptr_   = nullptr;  // = mapped_ptr_
@@ -224,8 +228,6 @@ class SharedMemory {
     NativeThread server_thread_;
     UniqueFd     shutdown_;  // close to signal server thread shutdown
 
-    std::string temp_root_;
-
     static std::string make_sentinel_base(const std::string& name) {
         char buf[32];
         // Using std::to_string here causes non-deterministic PGO builds.
@@ -235,13 +237,13 @@ class SharedMemory {
     }
 
    public:
-    explicit SharedMemory(const std::string& name, const TempRoot& tempRoot) noexcept :
-        temp_root_(tempRoot.prefix) {
-        set_name(name);
-    }
+    SharedMemory() = default;
 
-    explicit SharedMemory(const TempRoot& tempRoot) noexcept :
-        temp_root_(tempRoot.prefix) {}
+    explicit SharedMemory(const std::string& name, const TempRoot& tempRoot) noexcept :
+        name_(name),
+        shared_dir_(tempRoot.prefix + "/" + make_sentinel_base(name)),
+        init_lock_path_(shared_dir_ + "/init_lock"),
+        socket_path_(shared_dir_ + "/" + std::to_string(getpid()) + ".sock") {}
 
     ~SharedMemory() noexcept {
         if (!socket_path_.empty())
@@ -287,12 +289,11 @@ class SharedMemory {
         std::swap(socket_path_, other.socket_path_);
         std::swap(server_thread_, other.server_thread_);
         std::swap(shutdown_, other.shutdown_);
-        std::swap(temp_root_, other.temp_root_);
     }
 
-    void set_name(const std::string& name) {
+    void set_name(const std::string& name, const TempRoot& tempRoot) {
         name_           = name;
-        shared_dir_     = temp_root_ + "/" + make_sentinel_base(name);
+        shared_dir_     = tempRoot.prefix + "/" + make_sentinel_base(name);
         init_lock_path_ = shared_dir_ + "/init_lock";
         socket_path_    = shared_dir_ + "/" + std::to_string(getpid()) + ".sock";
     }
@@ -508,42 +509,122 @@ class SharedMemory {
         return memfd;
     }
 
-    bool start_server(UniqueFd memfd) {
-        int shutdown_pipe[2];
-#if !defined(__APPLE__)
-        if (pipe2(shutdown_pipe, O_CLOEXEC) != 0)
+   public:
+    [[nodiscard]] bool open(const T& initial_value, UniqueFd memfd = {}) noexcept {
+        if (socket_path_.size() >= sizeof(sockaddr_un::sun_path))
             return false;
-#else
-        if (pipe(shutdown_pipe) != 0)
+
+        if (mkdir(shared_dir_.c_str(), 0700) != 0 && errno != EEXIST)
             return false;
-        set_cloexec(shutdown_pipe[0]);
-        set_cloexec(shutdown_pipe[1]);
+
+        {
+            auto initLock = InitLock::wait_for_init_lock(init_lock_path_);
+            if (!initLock.is_valid())
+                return false;
+
+            // Try to receive the shared memfd
+            const bool               preinitialized = memfd.is_valid();
+            bool                     received_peer  = false;
+            std::vector<std::string> peer_sockets = get_peer_sockets();
+            for (const auto& sock_path : peer_sockets)
+            {
+                UniqueFd peer_memfd = try_receive_memfd(sock_path);
+                if (peer_memfd.is_valid())
+                {
+                    memfd         = std::move(peer_memfd);
+                    received_peer = true;
+                    break;
+                }
+            }
+
+            const bool creator = !received_peer;
+
+            if (creator && !preinitialized)
+            {
+                memfd = create_memfd();
+                if (!memfd.is_valid())
+                    return false;
+            }
+
+            assert(memfd.is_valid());
+
+            T* mapped_mem;
+            if (creator && preinitialized)
+                mapped_mem = data_ptr_;
+            else
+            {
+                mapped_mem = static_cast<T*>(detail::map_shared(memfd.get(), sizeof(T)));
+                if (mapped_mem == MAP_FAILED)
+                    return false;
+                if (preinitialized)
+                    munmap(mapped_ptr_, sizeof(T));
+            }
+
+#ifdef MADV_HUGEPAGE
+            (void) madvise(mapped_mem, sizeof(T), MADV_HUGEPAGE);
 #endif
-        UniqueFd shutdown_receiver(shutdown_pipe[0]);
-        shutdown_ = UniqueFd(shutdown_pipe[1]);
 
-        auto server_fd = create_unix_socket();
-        if (!server_fd.is_valid())
-            return false;
+            if (creator && !preinitialized)
+            {
+                // Creator is responsible for initialization
+#ifdef MADV_POPULATE_WRITE
+                (void) madvise(mapped_mem, sizeof(T), MADV_POPULATE_WRITE);
+#endif
+                *mapped_mem = initial_value;
+            }
 
-        struct sockaddr_un addr = {};
-        addr.sun_family         = AF_UNIX;
-        strncpy(addr.sun_path, socket_path_.c_str(), sizeof(addr.sun_path) - 1);
+#if defined(__linux__)
+            if (creator)
+                (void) madvise(mapped_mem, sizeof(T), MADV_COLLAPSE);
+#endif
 
-        detail::SharedMemoryRegistry::register_socket_path(socket_path_);
-        unlink(socket_path_.c_str());
-        if (bind(server_fd.get(), reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == -1
-            || listen(server_fd.get(), 5) == -1)
-            return false;
+            mapped_ptr_ = data_ptr_ = mapped_mem;
 
-        server_thread_ =
-          make_server_thread(std::move(memfd), std::move(shutdown_receiver), std::move(server_fd));
-        return server_thread_.joinable();
+            int shutdown_pipe[2];
+#if !defined(__APPLE__)
+            if (pipe2(shutdown_pipe, O_CLOEXEC) != 0)
+                return false;
+#else
+            if (pipe(shutdown_pipe) != 0)
+                return false;
+            set_cloexec(shutdown_pipe[0]);
+            set_cloexec(shutdown_pipe[1]);
+#endif
+            UniqueFd shutdown_receiver(shutdown_pipe[0]);
+            shutdown_ = UniqueFd(shutdown_pipe[1]);
+
+            auto server_fd = create_unix_socket();
+            if (!server_fd.is_valid())
+                return false;
+
+            struct sockaddr_un addr = {};
+            addr.sun_family         = AF_UNIX;
+            strncpy(addr.sun_path, socket_path_.c_str(), sizeof(addr.sun_path) - 1);
+
+            detail::SharedMemoryRegistry::register_socket_path(socket_path_);
+            unlink(socket_path_.c_str());
+            if (bind(server_fd.get(), reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == -1
+                || listen(server_fd.get(), 5) == -1)
+            {
+                return false;
+            }
+
+            // Don't release the init lock until we've actually made a socket that
+            // other fishes can use.
+            server_thread_ = make_server_thread(std::move(memfd), std::move(shutdown_receiver),
+                                                std::move(server_fd));
+            if (!server_thread_.joinable())
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
-   public:
-    template<typename Initializer, typename Namer>
-    [[nodiscard]] bool open(Initializer&& initialize, Namer&& make_name) {
+    [[nodiscard]] bool open(const Initializer& initialize,
+                            const Namer&       make_name,
+                            const TempRoot&    tempRoot) {
         UniqueFd memfd = create_memfd();
         if (!memfd.is_valid())
             return false;
@@ -560,105 +641,9 @@ class SharedMemory {
         (void) madvise(mapped_mem, sizeof(T), MADV_POPULATE_WRITE);
 #endif
         new (mapped_mem) T{};
-        std::forward<Initializer>(initialize)(*mapped_mem);
-        set_name(std::forward<Namer>(make_name)(*mapped_mem));
-
-        if (socket_path_.size() >= sizeof(sockaddr_un::sun_path))
-            return false;
-        if (mkdir(shared_dir_.c_str(), 0700) != 0 && errno != EEXIST)
-            return false;
-
-        auto initLock = InitLock::wait_for_init_lock(init_lock_path_);
-        if (!initLock.is_valid())
-            return false;
-
-        bool creator = true;
-        for (const auto& sock_path : get_peer_sockets())
-        {
-            UniqueFd peer_memfd = try_receive_memfd(sock_path);
-            if (!peer_memfd.is_valid())
-                continue;
-
-            T* peer_mem = static_cast<T*>(detail::map_shared(peer_memfd.get(), sizeof(T)));
-            if (peer_mem == MAP_FAILED)
-                return false;
-
-            munmap(mapped_ptr_, sizeof(T));
-            mapped_ptr_ = data_ptr_ = peer_mem;
-            memfd                   = std::move(peer_memfd);
-            creator                 = false;
-            break;
-        }
-
-#if defined(__linux__)
-        if (creator)
-            (void) madvise(mapped_ptr_, sizeof(T), MADV_COLLAPSE);
-#endif
-        return start_server(std::move(memfd));
-    }
-
-    [[nodiscard]] bool open(const T& initial_value) noexcept {
-        if (socket_path_.size() >= sizeof(sockaddr_un::sun_path))
-            return false;
-
-        if (mkdir(shared_dir_.c_str(), 0700) != 0 && errno != EEXIST)
-            return false;
-
-        {
-            auto initLock = InitLock::wait_for_init_lock(init_lock_path_);
-            if (!initLock.is_valid())
-                return false;
-
-            // Try to receive the shared memfd
-            UniqueFd                 memfd;
-            std::vector<std::string> peer_sockets = get_peer_sockets();
-            for (const auto& sock_path : peer_sockets)
-            {
-                memfd = try_receive_memfd(sock_path);
-                if (memfd.is_valid())
-                    break;
-            }
-
-            const bool creator = !memfd.is_valid();  // We must create it
-
-            if (creator)
-            {
-                // Failed to get it from a peer (no peers, or only dead peers), so create
-                memfd = create_memfd();
-                if (!memfd.is_valid())
-                    return false;
-            }
-
-            assert(memfd.is_valid());
-
-            // Try to map the memfd
-            T* mapped_mem = static_cast<T*>(detail::map_shared(memfd.get(), sizeof(T)));
-            if (mapped_mem == MAP_FAILED)
-                return false;
-
-#ifdef MADV_HUGEPAGE
-            (void) madvise(mapped_mem, sizeof(T), MADV_HUGEPAGE);
-#endif
-
-            if (creator)
-            {
-                // Creator is responsible for initialization
-#ifdef MADV_POPULATE_WRITE
-                (void) madvise(mapped_mem, sizeof(T), MADV_POPULATE_WRITE);
-#endif
-                *mapped_mem = initial_value;
-
-#if defined(__linux__)
-                (void) madvise(mapped_mem, sizeof(T), MADV_COLLAPSE);
-#endif
-            }
-
-            mapped_ptr_ = data_ptr_ = mapped_mem;
-            if (!start_server(std::move(memfd)))
-                return false;
-        }
-
-        return true;
+        initialize(*mapped_mem);
+        set_name(make_name(*mapped_mem), tempRoot);
+        return open(*mapped_mem, std::move(memfd));
     }
 };
 
@@ -674,14 +659,15 @@ template<typename T>
     return std::nullopt;
 }
 
-template<typename T, typename Initializer, typename Namer>
-[[nodiscard]] std::optional<SharedMemory<T>> create_shared(Initializer&& initialize,
-                                                           Namer&&       make_name) {
+template<typename T>
+[[nodiscard]] std::optional<SharedMemory<T>>
+create_shared(const std::function<void(T&)>& initialize,
+              const std::function<std::string(const T&)>& make_name) {
     auto tempRoot = TempRoot::get_temp_root();
     if (!tempRoot.has_value())
         return std::nullopt;
-    SharedMemory<T> shm(*tempRoot);
-    if (shm.open(std::forward<Initializer>(initialize), std::forward<Namer>(make_name)))
+    SharedMemory<T> shm;
+    if (shm.open(initialize, make_name, *tempRoot))
         return shm;
     return std::nullopt;
 }

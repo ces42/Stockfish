@@ -414,14 +414,9 @@ class SharedMemoryBackend {
     SharedMemoryBackend(const std::string& shm_name, const T& value) :
         shm1(shm::create_shared<T>(shm_name, value)) {}
 
-    template<
-      typename Initializer,
-      typename Namer,
-      std::enable_if_t<std::is_invocable_v<Initializer, T&> && std::is_invocable_v<Namer, const T&>,
-                       int> = 0>
-    SharedMemoryBackend(Initializer&& initialize, Namer&& make_name) :
-        shm1(shm::create_shared<T>(std::forward<Initializer>(initialize),
-                                   std::forward<Namer>(make_name))) {}
+    SharedMemoryBackend(const std::function<void(T&)>& initialize,
+                        const std::function<std::string(const T&)>& make_name) :
+        shm1(shm::create_shared<T>(initialize, make_name)) {}
 
     void* get() const {
         const T* ptr = &shm1->get();
@@ -485,10 +480,9 @@ struct SharedMemoryBackendFallback {
     SharedMemoryBackendFallback(const std::string&, const T& value) :
         fallback_object(make_unique_large_page<T>(value)) {}
 
-    template<typename Initializer, std::enable_if_t<std::is_invocable_v<Initializer, T&>, int> = 0>
-    explicit SharedMemoryBackendFallback(Initializer&& initialize) :
+    explicit SharedMemoryBackendFallback(const std::function<void(T&)>& initialize) :
         fallback_object(make_unique_large_page<T>()) {
-        std::forward<Initializer>(initialize)(*fallback_object);
+        initialize(*fallback_object);
     }
 
     void* get() const { return fallback_object.get(); }
@@ -576,8 +570,7 @@ struct SystemWideSharedConstant {
     }
 
 #if defined(USE_UNIX_SHM)
-    template<typename Initializer, std::enable_if_t<std::is_invocable_v<Initializer, T&>, int> = 0>
-    SystemWideSharedConstant(Initializer&& initialize, usize discriminator) {
+    SystemWideSharedConstant(const std::function<void(T&)>& initialize, usize discriminator) {
         auto make_name = [discriminator](const T& value) {
             return makeShmName(value, discriminator);
         };
@@ -586,7 +579,7 @@ struct SystemWideSharedConstant {
         if (shm_backend.is_valid())
             backend = std::move(shm_backend);
         else
-            backend = SharedMemoryBackendFallback<T>(std::forward<Initializer>(initialize));
+            backend = SharedMemoryBackendFallback<T>(initialize);
     }
 #endif
 

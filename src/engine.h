@@ -96,6 +96,7 @@ class Engine {
 
     void                                 verify_network() const;
     std::unique_ptr<Eval::NNUE::Network> get_default_network();
+    void get_default_network(Eval::NNUE::Network&);
     void                                 load_network(const std::filesystem::path& file);
     void save_network(const std::optional<std::filesystem::path>& file);
 

@@ -64,11 +64,7 @@ Engine::Engine(std::optional<std::filesystem::path> path) :
     networkFile{std::nullopt, ""},
     network(numaContext,
 #if defined(USE_UNIX_SHM)
-            [this](NN::Network& network_) {
-                NN::EvalFile loadedFile{std::nullopt, ""};
-                network_.load(binaryDirectory, std::filesystem::path{}, loadedFile);
-                networkFile = std::move(loadedFile);
-            }
+            [this](NN::Network& network_) { get_default_network(network_); }
 #else
             get_default_network()
 #endif
@@ -311,10 +307,15 @@ void Engine::verify_network() const {
 std::unique_ptr<Eval::NNUE::Network> Engine::get_default_network() {
 
     auto network_ = std::make_unique<NN::Network>();
-
-    network_->load(binaryDirectory, std::filesystem::path{}, networkFile);
+    get_default_network(*network_);
 
     return network_;
+}
+
+void Engine::get_default_network(NN::Network& network_) {
+    NN::EvalFile loadedFile{std::nullopt, ""};
+    network_.load(binaryDirectory, std::filesystem::path{}, loadedFile);
+    networkFile = std::move(loadedFile);
 }
 
 void Engine::load_network(const std::filesystem::path& file) {

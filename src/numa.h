@@ -1525,10 +1525,10 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
     }
 
 #if defined(USE_UNIX_SHM)
-    template<typename Initializer, std::enable_if_t<std::is_invocable_v<Initializer, T&>, int> = 0>
-    LazyNumaReplicatedSystemWide(NumaReplicationContext& ctx, Initializer&& initialize) :
+    LazyNumaReplicatedSystemWide(NumaReplicationContext& ctx,
+                                 const std::function<void(T&)>& initialize) :
         NumaReplicatedBase(ctx) {
-        prepare_replicate_from(std::forward<Initializer>(initialize));
+        prepare_replicate_from(initialize);
     }
 #endif
 
@@ -1651,8 +1651,7 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
     }
 
 #if defined(USE_UNIX_SHM)
-    template<typename Initializer>
-    void prepare_replicate_from(Initializer&& initialize) {
+    void prepare_replicate_from(const std::function<void(T&)>& initialize) {
         instances.clear();
 
         const NumaConfig& cfg = get_numa_config();
