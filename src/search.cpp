@@ -264,10 +264,19 @@ void Search::Worker::start_searching() {
     main_manager()->updates.onBestmove(bestmove, ponder);
 }
 
+// PawnValue = 208
+Value blunderValue = 158; // ~ 0.76 pawns
+// Value h2EvalDiff = 110;
+Value h3EvalDiff = 120;
+double minTimeFrac = 0.314;
+double minRemainingTime = 0.103;
+
+
 // Main iterative deepening loop. It calls search() repeatedly with increasing
 // depth until the allocated thinking time has been consumed, the user stops
 // the search, or the maximum search depth is reached.
 bool Search::Worker::iterative_deepening() {
+    bool notSingular = false;
 
     SearchManager* mainThread = (is_mainthread() ? main_manager() : nullptr);
 
@@ -278,6 +287,7 @@ bool Search::Worker::iterative_deepening() {
     Value       lastBestMoveScore = -VALUE_INFINITE;
 
     Value  alpha, beta;
+    Depth adjustedDepth = 1;
     Value  bestValue     = -VALUE_INFINITE;
     Color  us            = rootPos.side_to_move();
     double timeReduction = 1, totBestMoveChanges = 0;
@@ -389,7 +399,7 @@ bool Search::Worker::iterative_deepening() {
             {
                 // Adjust the effective depth searched, but ensure at least one
                 // effective increment for every four searchAgain steps (see issue #2717).
-                Depth adjustedDepth =
+                adjustedDepth =
                   std::max(1, rootDepth - failedHighCnt - 3 * (searchAgainCounter + 1) / 4);
                 rootDelta = beta - alpha;
                 bestValue = search<Root>(rootPos, ss, alpha, beta, adjustedDepth, false);
@@ -565,6 +575,8 @@ bool Search::Worker::iterative_deepening() {
             th->worker->bestMoveChanges = 0;
         }
 
+        Move bestMove = rootMoves[0].pv[0];
+
         // Do we have time for the next iteration? Can we stop searching now?
         if (limits.use_time_management() && !threads.stop && !mainThread->stopOnPonderhit)
         {
@@ -596,6 +608,68 @@ bool Search::Worker::iterative_deepening() {
                 totalTime = std::min(500.0, totalTime);
 
             auto elapsedTime = elapsed();
+
+            auto minTime = totalTime * minTimeFrac;
+            auto maxTime = totalTime * (1 - minRemainingTime);
+
+            auto razor_less = [&](Stack *ss, Value x, Depth d) {
+                return search<NonPV>(rootPos, ss, x - 1, x, d, false) < x;
+            };
+
+            auto heuristic3 = [&]() {
+                if (rootMoves.size() == 1 || lastBestMoveDepth > 1)
+                    return false;
+
+                ss->excludedMove = bestMove;
+                bool ret = razor_less(ss, bestValue - h3EvalDiff/2, 1)
+                    && razor_less(ss, bestValue - h3EvalDiff, 2);
+
+                ss->excludedMove = Move::none();
+                return ret;
+            };
+
+            // bool h2 = heuristic2();
+            // bool h3 = heuristic3();
+            if (rootDepth > 6
+                && elapsedTime > minTime
+                && elapsedTime < maxTime
+                && !notSingular
+                && rootMoves[0].pv.size() >= 2
+                && heuristic3()
+            ) {
+                Value red = int(blunderValue * (1.34 - (1.0 * elapsedTime)/totalTime));
+                bool oppNonsingular;
+                {
+                    StateInfo st;
+                    do_move(rootPos, bestMove, st, ss);
+                    (ss+1)->excludedMove = rootMoves[0].pv[1];
+                    oppNonsingular = !razor_less(ss + 1, -bestValue - red/2, 1);
+                    (ss+1)->excludedMove = Move::none();
+                    undo_move(rootPos, bestMove);
+                }
+                dbg_hit_on(oppNonsingular);
+
+                ss->excludedMove = bestMove;
+                bool isSingular = razor_less(ss, bestValue - red, adjustedDepth);
+                ss->excludedMove = Move::none();
+
+                dbg_hit_on(isSingular, 1);
+                // if (h2)
+                //     dbg_hit_on(rootPos.capture(bestMove), 8);
+
+                if (oppNonsingular && isSingular)
+                    totalTime *= minTimeFrac; // will cause us to move now
+                else {
+                    notSingular = true;
+                }
+                dbg_mean_of(elapsed() - elapsedTime, 1);
+
+            } else if (rootDepth > 6
+                && elapsedTime > minTime
+                && elapsedTime < maxTime
+                && !notSingular) {
+                dbg_mean_of(elapsed() - elapsedTime);
+            }
 
             // Stop the search if we have exceeded totalTime or maximum time,
             // or if we know that there are no better moves in the analysed line(s).
