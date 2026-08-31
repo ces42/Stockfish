@@ -638,37 +638,38 @@ bool Search::Worker::iterative_deepening() {
                 && heuristic3()
             ) {
                 Value red = int(blunderValue * (1.34 - (1.0 * elapsedTime)/totalTime));
-                bool oppNonsingular;
+                bool oppNonsingular, isSingular = false;
                 {
                     StateInfo st;
                     do_move(rootPos, bestMove, st, ss);
                     (ss+1)->excludedMove = rootMoves[0].pv[1];
-                    oppNonsingular = !razor_less(ss + 1, -bestValue - red/2, 1);
+                    oppNonsingular = !razor_less(ss + 1, -bestValue - 2*red/3, 2);
                     (ss+1)->excludedMove = Move::none();
                     undo_move(rootPos, bestMove);
                 }
-                dbg_hit_on(oppNonsingular);
+                // dbg_hit_on(oppNonsingular);
 
-                ss->excludedMove = bestMove;
-                bool isSingular = razor_less(ss, bestValue - red, adjustedDepth);
-                ss->excludedMove = Move::none();
+                if (oppNonsingular)
+                {
+                    ss->excludedMove = bestMove;
+                    isSingular = razor_less(ss, bestValue - red, adjustedDepth);
+                    ss->excludedMove = Move::none();
+                }
 
-                dbg_hit_on(isSingular, 1);
-                // if (h2)
-                //     dbg_hit_on(rootPos.capture(bestMove), 8);
+                // dbg_hit_on(isSingular, 1);
 
                 if (oppNonsingular && isSingular)
                     totalTime *= minTimeFrac; // will cause us to move now
                 else {
                     notSingular = true;
                 }
-                dbg_mean_of(elapsed() - elapsedTime, 1);
+                // dbg_mean_of(elapsed() - elapsedTime, 1);
 
             } else if (rootDepth > 6
                 && elapsedTime > minTime
                 && elapsedTime < maxTime
                 && !notSingular) {
-                dbg_mean_of(elapsed() - elapsedTime);
+                // dbg_mean_of(elapsed() - elapsedTime);
             }
 
             // Stop the search if we have exceeded totalTime or maximum time,
