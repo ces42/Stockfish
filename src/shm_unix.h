@@ -539,6 +539,9 @@ class SharedMemory {
             if (creator)
             {
                 // Creator is responsible for initialization
+#ifdef MADV_POPULATE_WRITE
+                (void) madvise(mapped_mem, sizeof(T), MADV_POPULATE_WRITE);
+#endif
                 *mapped_mem = initial_value;
 
 #if defined(__linux__)
