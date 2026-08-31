@@ -1519,18 +1519,11 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
    public:
     using ReplicatorFuncType = std::function<T(const T&)>;
 
-    LazyNumaReplicatedSystemWide(NumaReplicationContext& ctx, std::unique_ptr<T>&& source) :
-        NumaReplicatedBase(ctx) {
-        prepare_replicate_from(std::move(source));
-    }
-
-#if defined(USE_UNIX_SHM)
     LazyNumaReplicatedSystemWide(NumaReplicationContext& ctx,
                                  const std::function<void(T&)>& initialize) :
         NumaReplicatedBase(ctx) {
         prepare_replicate_from(initialize);
     }
-#endif
 
     LazyNumaReplicatedSystemWide(const LazyNumaReplicatedSystemWide&) = delete;
     LazyNumaReplicatedSystemWide(LazyNumaReplicatedSystemWide&& other) noexcept :
@@ -1650,8 +1643,8 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
         }
     }
 
-#if defined(USE_UNIX_SHM)
     void prepare_replicate_from(const std::function<void(T&)>& initialize) {
+#if defined(USE_UNIX_SHM)
         instances.clear();
 
         const NumaConfig& cfg = get_numa_config();
@@ -1664,8 +1657,12 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
             instances.resize(cfg.num_numa_nodes());
         else
             assert(cfg.num_numa_nodes() == 1);
-    }
+#else
+        auto source = std::make_unique<T>();
+        initialize(*source);
+        prepare_replicate_from(std::move(source));
 #endif
+    }
 };
 
 class NumaReplicationContext {
