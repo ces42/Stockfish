@@ -1524,6 +1524,14 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
         prepare_replicate_from(std::move(source));
     }
 
+#if defined(USE_UNIX_SHM)
+    template<typename Initializer, std::enable_if_t<std::is_invocable_v<Initializer, T&>, int> = 0>
+    LazyNumaReplicatedSystemWide(NumaReplicationContext& ctx, Initializer&& initialize) :
+        NumaReplicatedBase(ctx) {
+        prepare_replicate_from(std::forward<Initializer>(initialize));
+    }
+#endif
+
     LazyNumaReplicatedSystemWide(const LazyNumaReplicatedSystemWide&) = delete;
     LazyNumaReplicatedSystemWide(LazyNumaReplicatedSystemWide&& other) noexcept :
         NumaReplicatedBase(std::move(other)),
@@ -1641,6 +1649,24 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
             instances.emplace_back(SystemWideSharedConstant<T>(*source, get_discriminator(0)));
         }
     }
+
+#if defined(USE_UNIX_SHM)
+    template<typename Initializer>
+    void prepare_replicate_from(Initializer&& initialize) {
+        instances.clear();
+
+        const NumaConfig& cfg = get_numa_config();
+        assert(cfg.num_numa_nodes() > 0);
+        cfg.execute_on_numa_node(0, [this, &initialize]() {
+            instances.emplace_back(SystemWideSharedConstant<T>(initialize, get_discriminator(0)));
+        });
+
+        if (cfg.requires_memory_replication())
+            instances.resize(cfg.num_numa_nodes());
+        else
+            assert(cfg.num_numa_nodes() == 1);
+    }
+#endif
 };
 
 class NumaReplicationContext {

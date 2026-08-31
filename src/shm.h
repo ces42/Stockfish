@@ -414,6 +414,15 @@ class SharedMemoryBackend {
     SharedMemoryBackend(const std::string& shm_name, const T& value) :
         shm1(shm::create_shared<T>(shm_name, value)) {}
 
+    template<
+      typename Initializer,
+      typename Namer,
+      std::enable_if_t<std::is_invocable_v<Initializer, T&> && std::is_invocable_v<Namer, const T&>,
+                       int> = 0>
+    SharedMemoryBackend(Initializer&& initialize, Namer&& make_name) :
+        shm1(shm::create_shared<T>(std::forward<Initializer>(initialize),
+                                   std::forward<Namer>(make_name))) {}
+
     void* get() const {
         const T* ptr = &shm1->get();
         return reinterpret_cast<void*>(const_cast<T*>(ptr));
@@ -476,6 +485,12 @@ struct SharedMemoryBackendFallback {
     SharedMemoryBackendFallback(const std::string&, const T& value) :
         fallback_object(make_unique_large_page<T>(value)) {}
 
+    template<typename Initializer, std::enable_if_t<std::is_invocable_v<Initializer, T&>, int> = 0>
+    explicit SharedMemoryBackendFallback(Initializer&& initialize) :
+        fallback_object(make_unique_large_page<T>()) {
+        std::forward<Initializer>(initialize)(*fallback_object);
+    }
+
     void* get() const { return fallback_object.get(); }
 
     SharedMemoryBackendFallback(const SharedMemoryBackendFallback&)            = delete;
@@ -515,6 +530,24 @@ struct SystemWideSharedConstant {
         return buf;
     }
 
+    static std::string makeShmName(const T& value, usize discriminator) {
+        usize content_hash    = std::hash<T>{}(value);
+        usize executable_hash = hash_string(getExecutablePathHash());
+
+        char buf[1024];
+        std::snprintf(buf, sizeof(buf), "Local\\sf_%zu$%zu$%zu", content_hash, executable_hash,
+                      discriminator);
+        std::string shm_name = buf;
+
+#if defined(USE_UNIX_SHM)
+        // POSIX shared memory names must start with a slash and are length-limited.
+        shm_name = "/sf_" + createHashString(shm_name);
+        if (shm_name.size() > SF_MAX_SEM_NAME_LEN)
+            shm_name = shm_name.substr(0, SF_MAX_SEM_NAME_LEN - 1);
+#endif
+        return shm_name;
+    }
+
    public:
     // We can't run the destructor because it may be in a completely different process.
     // The object stored must also be obviously in-line but we can't check for that, other than some basic checks that cover most cases.
@@ -528,24 +561,7 @@ struct SystemWideSharedConstant {
     // Content is addressed by its hash. An additional discriminator can be added to account for differences
     // that are not present in the content, for example NUMA node allocation.
     SystemWideSharedConstant(const T& value, usize discriminator = 0) {
-        usize content_hash    = std::hash<T>{}(value);
-        usize executable_hash = hash_string(getExecutablePathHash());
-
-        char buf[1024];
-        std::snprintf(buf, sizeof(buf), "Local\\sf_%zu$%zu$%zu", content_hash, executable_hash,
-                      discriminator);
-        std::string shm_name = buf;
-
-#if defined(USE_UNIX_SHM)
-        // POSIX shared memory names must start with a slash
-        shm_name = "/sf_" + createHashString(shm_name);
-
-        // hash name and make sure it is not longer than SF_MAX_SEM_NAME_LEN
-        if (shm_name.size() > SF_MAX_SEM_NAME_LEN)
-        {
-            shm_name = shm_name.substr(0, SF_MAX_SEM_NAME_LEN - 1);
-        }
-#endif
+        std::string shm_name = makeShmName(value, discriminator);
 
         SharedMemoryBackend<T> shm_backend(shm_name, value);
 
@@ -558,6 +574,21 @@ struct SystemWideSharedConstant {
             backend = SharedMemoryBackendFallback<T>(shm_name, value);
         }
     }
+
+#if defined(USE_UNIX_SHM)
+    template<typename Initializer, std::enable_if_t<std::is_invocable_v<Initializer, T&>, int> = 0>
+    SystemWideSharedConstant(Initializer&& initialize, usize discriminator) {
+        auto make_name = [discriminator](const T& value) {
+            return makeShmName(value, discriminator);
+        };
+        SharedMemoryBackend<T> shm_backend(initialize, make_name);
+
+        if (shm_backend.is_valid())
+            backend = std::move(shm_backend);
+        else
+            backend = SharedMemoryBackendFallback<T>(std::forward<Initializer>(initialize));
+    }
+#endif
 
     SystemWideSharedConstant(const SystemWideSharedConstant&)            = delete;
     SystemWideSharedConstant& operator=(const SystemWideSharedConstant&) = delete;

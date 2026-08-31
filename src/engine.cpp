@@ -62,7 +62,17 @@ Engine::Engine(std::optional<std::filesystem::path> path) :
     states(new std::deque<StateInfo>(1)),
     threads(),
     networkFile{std::nullopt, ""},
-    network(numaContext, get_default_network()) {
+    network(numaContext,
+#if defined(USE_UNIX_SHM)
+            [this](NN::Network& network_) {
+                NN::EvalFile loadedFile{std::nullopt, ""};
+                network_.load(binaryDirectory, std::filesystem::path{}, loadedFile);
+                networkFile = std::move(loadedFile);
+            }
+#else
+            get_default_network()
+#endif
+    ) {
 
     pos.set(StartFEN, false, &states->back());
 
