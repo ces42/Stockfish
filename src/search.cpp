@@ -633,38 +633,19 @@ bool Search::Worker::iterative_deepening() {
                 && elapsedTime > minTime
                 && elapsedTime < maxTime
                 && !notSingular
-                && dbg_hit_on(rootMoves[0].pv.size() >= 2
-                              && lastBestMoveDepth <= 4,
-                   1)
-                && dbg_hit_on(razor_less(ss, bestMove, bestValue - hmargin, hdepth), 3)
-                && dbg_hit_on(opp_nonsingular(), 4)
+                && rootMoves[0].pv.size() >= 2
+                && lastBestMoveDepth <= 4
+                && razor_less(ss, bestMove, bestValue - hmargin, hdepth)
+                && opp_nonsingular()
             ) {
-                dbg_mean_of(100.0 * elapsedTime/totalTime, 10);
-                dbg_stdev_of(100.0 * elapsedTime/totalTime, 10);
-                assert(elapsedTime <= totalTime);
                 Value red = int(safetyMargin * (1.34 - (1.0 * elapsedTime)/totalTime));
-                bool isSingular = false;
 
-                isSingular = razor_less(ss, bestMove, bestValue - red, adjustedDepth);
-
-                dbg_hit_on(isSingular, 10);
+                bool isSingular = razor_less(ss, bestMove, bestValue - red, adjustedDepth);
 
                 if (isSingular)
                     totalTime *= minTimeFrac; // will cause us to move now
                 else
                     notSingular = true;
-
-                auto el = elapsed();
-                dbg_mean_of(el - elapsedTime, 1);
-                dbg_mean_of(100.0 * (el - elapsedTime) / totalTime, 2);
-
-            } else if (adjustedDepth > 6
-                && elapsedTime > minTime
-                && elapsedTime < maxTime
-                && !notSingular
-                && rootMoves[0].pv.size() >= 2
-                && lastBestMoveDepth <= 4) {
-                dbg_mean_of(elapsed() - elapsedTime);
             }
 
             // Stop the search if we have exceeded totalTime or maximum time,
