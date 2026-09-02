@@ -273,6 +273,7 @@ bool Search::Worker::iterative_deepening() {
 
     PVMoves pv;
 
+    Depth adjustedDepth = 1;
     RootPVMoves lastBestMovePV;
     Depth       lastBestMoveDepth = 0;
     Value       lastBestMoveScore = -VALUE_INFINITE;
@@ -389,7 +390,7 @@ bool Search::Worker::iterative_deepening() {
             {
                 // Adjust the effective depth searched, but ensure at least one
                 // effective increment for every four searchAgain steps (see issue #2717).
-                Depth adjustedDepth =
+                adjustedDepth =
                   std::max(1, rootDepth - failedHighCnt - 3 * (searchAgainCounter + 1) / 4);
                 rootDelta = beta - alpha;
                 bestValue = search<Root>(rootPos, ss, alpha, beta, adjustedDepth, false);
@@ -565,6 +566,7 @@ bool Search::Worker::iterative_deepening() {
             th->worker->bestMoveChanges = 0;
         }
 
+        Move bestMove = rootMoves[0].pv[0];
         // Do we have time for the next iteration? Can we stop searching now?
         if (limits.use_time_management() && !threads.stop && !mainThread->stopOnPonderhit)
         {
@@ -596,6 +598,28 @@ bool Search::Worker::iterative_deepening() {
                 totalTime = std::min(500.0, totalTime);
 
             auto elapsedTime = elapsed();
+
+            auto razor_less = [&](Stack *ss, Move excluded, Value x, Depth d) {
+                ss->excludedMove = excluded;
+                bool ret = search<NonPV>(rootPos, ss, x - 1, x, d, false) < x;
+                ss->excludedMove = Move::none();
+
+                return ret;
+            };
+
+            auto minTime = totalTime * 0.4;
+            auto maxTime = totalTime * 0.9;
+            Value red = 212 - 158 * elapsedTime / totalTime;
+            if (adjustedDepth > 8
+                && elapsedTime > minTime
+                && elapsedTime < maxTime
+                && lastBestMoveDepth <= 2
+                && razor_less(ss, bestMove, bestValue - red/3, 5)
+            ) {
+                bool isSingular = razor_less(ss, bestMove, bestValue - red, adjustedDepth);
+                if (isSingular)
+                    totalTime = minTime;
+            }
 
             // Stop the search if we have exceeded totalTime or maximum time,
             // or if we know that there are no better moves in the analysed line(s).
