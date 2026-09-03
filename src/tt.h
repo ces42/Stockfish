@@ -71,8 +71,9 @@ struct TTWriter {
 
    private:
     friend class TranspositionTable;
-    TTEntry* entry;
-    TTWriter(TTEntry* tte);
+    Cluster* cluster;
+    int      index;
+    TTWriter(Cluster* cl, int idx);
 };
 
 
@@ -96,7 +97,7 @@ class TranspositionTable {
     //   3) a writer object to the entry
     std::tuple<bool, TTData, TTWriter> probe(const Key key) const;
     // The hash function; its only external use is memory prefetching
-    TTEntry* first_entry(const Key key) const;
+    Cluster* get_cluster(const Key key) const;
 
    private:
     friend struct TTEntry;
