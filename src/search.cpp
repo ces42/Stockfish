@@ -273,6 +273,7 @@ bool Search::Worker::iterative_deepening() {
 
     PVMoves pv;
 
+    bool searched = false;
     Depth adjustedDepth = 1;
     RootPVMoves lastBestMovePV;
     Depth       lastBestMoveDepth = 0;
@@ -599,7 +600,7 @@ bool Search::Worker::iterative_deepening() {
 
             auto elapsedTime = elapsed();
 
-            auto razor_less = [&](Stack *ss, Move excluded, Value x, Depth d) {
+            auto nullmargin_less = [&](Stack *ss, Move excluded, Value x, Depth d) {
                 ss->excludedMove = excluded;
                 bool ret = search<NonPV>(rootPos, ss, x - 1, x, d, false) < x;
                 ss->excludedMove = Move::none();
@@ -613,12 +614,12 @@ bool Search::Worker::iterative_deepening() {
             if (adjustedDepth > 8
                 && elapsedTime > minTime
                 && elapsedTime < maxTime
+                && !searched
                 && lastBestMoveDepth <= 2
-                && razor_less(ss, bestMove, bestValue - red/3, 5)
+                && nullmargin_less(ss, bestMove, bestValue - red/3, 5)
             ) {
-                bool isSingular = razor_less(ss, bestMove, bestValue - red, adjustedDepth);
-                if (isSingular)
-                    totalTime = minTime;
+                nullmargin_less(ss, bestMove, bestValue - red, adjustedDepth);
+                searched = true;
             }
 
             // Stop the search if we have exceeded totalTime or maximum time,
