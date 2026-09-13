@@ -262,25 +262,23 @@ inline constexpr auto PseudoAttacks = []() constexpr {
 
 // Returns the pseudo attacks of the given piece type
 // assuming an empty board.
-template<PieceType Pt>
-inline Bitboard attacks_bb(Square s, Color c = COLOR_NB) {
+sf_always_inline Bitboard attacks_bb(PieceType pt, Square s, Color c = COLOR_NB) {
 
-    assert((Pt != PAWN || c < COLOR_NB) && is_ok(s));
-    return Pt == PAWN ? PseudoAttacks[c][s] : PseudoAttacks[Pt][s];
+    assert((pt != PAWN || c < COLOR_NB) && is_ok(s));
+    return pt == PAWN ? PseudoAttacks[c][s] : PseudoAttacks[pt][s];
 }
 
 // Returns the attacks by the given piece
 // assuming the board is occupied according to the passed Bitboard.
 // Sliding piece attacks do not continue past an occupied square.
-template<PieceType Pt>
-inline Bitboard attacks_bb(Square s, Bitboard occupied) {
+sf_always_inline Bitboard attacks_bb(PieceType pt, Square s, Bitboard occupied) {
 
-    assert(Pt != PAWN && is_ok(s));
+    assert(pt != PAWN && is_ok(s));
 
 #ifdef USE_DUAL_HYPERBOLA_QUINT
     [[maybe_unused]] const auto [bishop, rook] = dual_magic(s).both_attacks_bb(occupied);
 
-    switch (Pt)
+    switch (pt)
     {
     case BISHOP :
         return bishop;
@@ -289,18 +287,18 @@ inline Bitboard attacks_bb(Square s, Bitboard occupied) {
     case QUEEN :
         return bishop | rook;
     default :
-        return PseudoAttacks[Pt][s];
+        return PseudoAttacks[pt][s];
     }
 #else
-    switch (Pt)
+    switch (pt)
     {
     case BISHOP :
     case ROOK :
-        return magic(s, Pt).attacks_bb(s, occupied);
+        return magic(s, pt).attacks_bb(s, occupied);
     case QUEEN :
-        return attacks_bb<BISHOP>(s, occupied) | attacks_bb<ROOK>(s, occupied);
+        return attacks_bb(BISHOP, s, occupied) | attacks_bb(ROOK, s, occupied);
     default :
-        return PseudoAttacks[Pt][s];
+        return PseudoAttacks[pt][s];
     }
 #endif
 }
@@ -309,28 +307,8 @@ inline std::pair<Bitboard, Bitboard> both_attacks_bb(Square s, Bitboard occupied
 #ifdef USE_DUAL_HYPERBOLA_QUINT
     return dual_magic(s).both_attacks_bb(occupied);
 #else
-    return {attacks_bb<BISHOP>(s, occupied), attacks_bb<ROOK>(s, occupied)};
+    return {attacks_bb(BISHOP, s, occupied), attacks_bb(ROOK, s, occupied)};
 #endif
-}
-
-// Returns the attacks by the given piece
-// assuming the board is occupied according to the passed Bitboard.
-// Sliding piece attacks do not continue past an occupied square.
-inline Bitboard attacks_bb(PieceType pt, Square s, Bitboard occupied) {
-
-    assert(pt != PAWN && is_ok(s));
-
-    switch (pt)
-    {
-    case BISHOP :
-        return attacks_bb<BISHOP>(s, occupied);
-    case ROOK :
-        return attacks_bb<ROOK>(s, occupied);
-    case QUEEN :
-        return attacks_bb<QUEEN>(s, occupied);
-    default :
-        return PseudoAttacks[pt][s];
-    }
 }
 
 inline Bitboard attacks_bb(Piece pc, Square s, Bitboard occupied) {
