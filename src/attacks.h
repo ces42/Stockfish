@@ -296,7 +296,8 @@ sf_always_inline Bitboard attacks_bb(PieceType pt, Square s, Bitboard occupied) 
     case ROOK :
         return magic(s, pt).attacks_bb(s, occupied);
     case QUEEN :
-        return attacks_bb(BISHOP, s, occupied) | attacks_bb(ROOK, s, occupied);
+        return magic(s, BISHOP).attacks_bb(s, occupied) |
+               magic(s, ROOK).attacks_bb(s, occupied);
     default :
         return PseudoAttacks[pt][s];
     }
