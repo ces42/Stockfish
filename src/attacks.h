@@ -24,6 +24,7 @@
 #include <initializer_list>
 #include <utility>
 
+#include "misc.h"
 #include "types.h"
 #include "bitboard.h"
 
