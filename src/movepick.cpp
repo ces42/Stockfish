@@ -200,7 +200,7 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
 
     [[maybe_unused]] Bitboard threatByLesser[KING + 1];
     [[maybe_unused]] const bool ttHit = bool(ttMove);
-    if (Type == QUIETS && ttHit)
+    if (Type == QUIETS && !ttHit)
     {
         threatByLesser[PAWN]   = 0;
         threatByLesser[KNIGHT] = threatByLesser[BISHOP] = pos.attacks_by<PAWN>(~us);
@@ -238,7 +238,7 @@ ExtMove* MovePicker::score(const MoveList<Type>& ml) {
             value += (*continuationHistory[3])[pc][to];
             value += (*continuationHistory[5])[pc][to];
 
-            if (ttHit)
+            if (!ttHit)
             {
                 value += (*continuationHistory[2])[pc][to];
                 // bonus for checks
