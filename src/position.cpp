@@ -1408,10 +1408,13 @@ bool Position::see_ge(Move m, int threshold) const {
 
     assert(color_of(piece_on(from)) == sideToMove);
     Bitboard occupied  = pieces() ^ from ^ to;  // xoring to is important for pinned piece logic
-    Color    stm       = sideToMove;
+    const Bitboard bishopSliders = attacks_bb(BISHOP, to) & pieces(BISHOP, QUEEN);
+    const Bitboard rookSliders   = attacks_bb(ROOK, to) & pieces(ROOK, QUEEN);
     Bitboard attackers = attackers_to(to, occupied);
-    Bitboard stmAttackers, bb;
-    int      res = 1;
+    Color    stm       = sideToMove;
+    Bitboard       stmAttackers, bb;
+    int            res           = 1;
+    Bitboard  needs_recheck = 0ULL;
 
     while (true)
     {
@@ -1442,7 +1445,7 @@ bool Position::see_ge(Move m, int threshold) const {
                 break;
             occupied ^= least_significant_square_bb(bb);
 
-            attackers |= attacks_bb(BISHOP, to, occupied) & pieces(BISHOP, QUEEN);
+            needs_recheck = bishopSliders & occupied & ~attackers;
         }
 
         else if ((bb = stmAttackers & pieces(KNIGHT)))
@@ -1458,7 +1461,7 @@ bool Position::see_ge(Move m, int threshold) const {
                 break;
             occupied ^= least_significant_square_bb(bb);
 
-            attackers |= attacks_bb(BISHOP, to, occupied) & pieces(BISHOP, QUEEN);
+            needs_recheck = bishopSliders & occupied & ~attackers;
         }
 
         else if ((bb = stmAttackers & pieces(ROOK)))
@@ -1467,7 +1470,7 @@ bool Position::see_ge(Move m, int threshold) const {
                 break;
             occupied ^= least_significant_square_bb(bb);
 
-            attackers |= attacks_bb(ROOK, to, occupied) & pieces(ROOK, QUEEN);
+            needs_recheck = rookSliders & occupied & ~attackers;
         }
 
         else if ((bb = stmAttackers & pieces(QUEEN)))
@@ -1477,15 +1480,33 @@ bool Position::see_ge(Move m, int threshold) const {
             assert(swap >= res);
             occupied ^= least_significant_square_bb(bb);
 
-            const auto [bishopAttacks, rookAttacks] = both_attacks_bb(to, occupied);
-            attackers |=
-              (bishopAttacks & pieces(BISHOP, QUEEN)) | (rookAttacks & pieces(ROOK, QUEEN));
+            needs_recheck = (bishopSliders | rookSliders) & occupied & ~attackers;
         }
 
         else  // KING
               // If we "capture" with the king but the opponent still has attackers,
               // reverse the result.
             return (attackers & ~pieces(stm)) ? res ^ 1 : res;
+
+        // while (needs_recheck)
+        // {
+        //     Square sq = pop_lsb(needs_recheck);
+        //     if (!((between_bb(sq, to) ^ to) & occupied))
+        //         attackers |= square_bb(sq);
+        // }
+        // unroll this this loop ^^^^^^^ once
+        if (needs_recheck)
+        {
+            Square sq = pop_lsb(needs_recheck);
+            if (!((between_bb(sq, to) ^ to) & occupied))
+                attackers |= square_bb(sq);
+            while (needs_recheck)
+            {
+                Square sq = pop_lsb(needs_recheck);
+                if (!((between_bb(sq, to) ^ to) & occupied))
+                    attackers |= square_bb(sq);
+            }
+        }
     }
 
     return bool(res);
