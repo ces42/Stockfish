@@ -131,8 +131,7 @@ class Position {
     Bitboard attackers_to(Square s, Bitboard occupied) const;
     bool     attackers_to_exist(Square s, Bitboard occupied, Color c) const;
     void     update_slider_blockers(Color c) const;
-    template<PieceType Pt>
-    Bitboard attacks_by(Color c) const;
+    Bitboard attacks_by(PieceType pt, Color c) const;
     Bitboard threats_by(PieceType pt) const;
 
     // Properties of moves
@@ -294,18 +293,17 @@ inline Square Position::castling_rook_square(CastlingRights cr) const {
 
 inline Bitboard Position::attackers_to(Square s) const { return attackers_to(s, pieces()); }
 
-template<PieceType Pt>
-inline Bitboard Position::attacks_by(Color c) const {
+inline Bitboard Position::attacks_by(PieceType pt, Color c) const {
 
-    if constexpr (Pt == PAWN)
+    if (pt == PAWN)
         return c == WHITE ? pawn_attacks_bb<WHITE>(pieces(WHITE, PAWN))
                           : pawn_attacks_bb<BLACK>(pieces(BLACK, PAWN));
     else
     {
         Bitboard threats   = 0;
-        Bitboard attackers = pieces(c, Pt);
+        Bitboard attackers = pieces(c, pt);
         while (attackers)
-            threats |= Attacks::attacks_bb(Pt, pop_lsb(attackers), pieces());
+            threats |= Attacks::attacks_bb(pt, pop_lsb(attackers), pieces());
         return threats;
     }
 }

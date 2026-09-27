@@ -171,9 +171,9 @@ Move* generate_pawn_moves(const Position& pos, Move* moveList, Bitboard target) 
 
         const Square epSq = pos.ep_square();
 
-        if (epSq != SQ_NONE &&
+        if (epSq != SQ_NONE
             // An en passant capture cannot resolve a discovered check
-            ! (Type == EVASIONS && (target & (epSq + Up))) )
+            && !(Type == EVASIONS && (target & (epSq + Up))) )
         {
             assert(rank_of(epSq) == relative_rank(Us, RANK_6));
 
@@ -201,8 +201,8 @@ Move* generate_moves(const Position& pos, Move* moveList, Bitboard target, Color
     Bitboard bb = pos.pieces(us, Pt) & ~pinned;
     while (bb)
     {
-        Square from = pop_lsb(bb);
-        Bitboard b  = Attacks::attacks_bb(Pt, from, pos.pieces()) & target;
+        Square   from = pop_lsb(bb);
+        Bitboard b    = Attacks::attacks_bb(Pt, from, pos.pieces()) & target;
 
         moveList = splat_moves(moveList, from, b);
     }
@@ -250,8 +250,7 @@ Move* generate_all(const Position& pos, Move* moveList, Color us) {
     if constexpr (Type == EVASIONS) {
         target = ~pos.pieces(us);
 
-        Bitboard slidingCheckers = pos.checkers() &
-          (pos.pieces(~us, BISHOP) | pos.pieces(~us, ROOK) | pos.pieces(~us, QUEEN));
+        Bitboard slidingCheckers = pos.checkers() & pos.pieces(~us, BISHOP, ROOK, QUEEN);
         while (slidingCheckers)
             target &= ~Attacks::ray_pass_bb(pop_lsb(slidingCheckers), ksq);
     }
@@ -266,11 +265,9 @@ Move* generate_all(const Position& pos, Move* moveList, Color us) {
                 Square rookSquare = pos.castling_rook_square(cr);
                 Square to = relative_square(us, rookSquare > ksq ? SQ_G1 : SQ_C1);
 
-                bool illegal = Attacks::between_bb(ksq, to) & pos.threats_by(ALL_PIECES);
-
-                if (illegal || (pos.is_chess960() && (pos.blockers_for_king(us) & rookSquare))) {
+                if (Attacks::between_bb(ksq, to) & pos.threats_by(ALL_PIECES)
+                    || (pos.is_chess960() && (pos.blockers_for_king(us) & rookSquare)))
                     continue;
-                }
 
                 *moveList++ = Move::make<CASTLING>(ksq, rookSquare);
             }

@@ -479,12 +479,9 @@ void Position::set_extra_bitboards() const {
     st->checkSquares[QUEEN]  = st->checkSquares[BISHOP] | st->checkSquares[ROOK];
     st->checkSquares[KING]   = 0;
 
-    st->threats[ALL_PIECES]  = st->threats[PAWN]   = attacks_by<PAWN>(~sideToMove);
-    st->threats[ALL_PIECES] |= st->threats[KNIGHT] = attacks_by<KNIGHT>(~sideToMove);
-    st->threats[ALL_PIECES] |= st->threats[BISHOP] = attacks_by<BISHOP>(~sideToMove);
-    st->threats[ALL_PIECES] |= st->threats[ROOK]   = attacks_by<ROOK>(~sideToMove);
-    st->threats[ALL_PIECES] |= st->threats[QUEEN]  = attacks_by<QUEEN>(~sideToMove);
-    st->threats[ALL_PIECES] |= st->threats[KING]   = attacks_by<KING>(~sideToMove);
+    st->threats[ALL_PIECES]  = 0;
+    for (PieceType pt = PAWN; pt <= KING; ++pt)
+        st->threats[ALL_PIECES] |= st->threats[pt] = attacks_by(pt, ~sideToMove);
 }
 
 
