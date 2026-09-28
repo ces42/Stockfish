@@ -27,6 +27,8 @@ namespace Stockfish::Attacks {
 Bitboard LineBB[SQUARE_NB][SQUARE_NB];
 Bitboard BetweenBB[SQUARE_NB][SQUARE_NB];
 Bitboard inverse_RayPassBB[SQUARE_NB][SQUARE_NB];
+Bitboard DiagBB[SQUARE_NB];
+Bitboard AntiDiagBB[SQUARE_NB];
 
 namespace {
 
@@ -185,6 +187,9 @@ void init() {
                 }
                 BetweenBB[s1][s2] |= s2;
             }
+
+        DiagBB[s1] = line_mask(s1, NORTH_EAST, SOUTH_WEST);
+        AntiDiagBB[s1] = line_mask(s1, NORTH_WEST, SOUTH_EAST);
     }
 }
 
