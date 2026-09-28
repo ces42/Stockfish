@@ -261,16 +261,13 @@ Move* generate_all(const Position& pos, Move* moveList, Color us) {
 
     if (Type == QUIETS && pos.can_castle(us & ANY_CASTLING)) {
         for (CastlingRights cr : {us & KING_SIDE, us & QUEEN_SIDE}) {
-            if (!pos.castling_impeded(cr) && pos.can_castle(cr)) {
-                Square rookSquare = pos.castling_rook_square(cr);
-                Square to = relative_square(us, rookSquare > ksq ? SQ_G1 : SQ_C1);
+            Square rookSquare = pos.castling_rook_square(cr);
+            Square to = relative_square(us, rookSquare > ksq ? SQ_G1 : SQ_C1);
 
-                if (Attacks::between_bb(ksq, to) & pos.threats_by(ALL_PIECES)
-                    || (pos.is_chess960() && (pos.blockers_for_king(us) & rookSquare)))
-                    continue;
-
+            if (!pos.castling_impeded(cr) && pos.can_castle(cr)
+                && !(Attacks::between_bb(ksq, to) & pos.threats_by(ALL_PIECES))
+                && !(pos.blockers_for_king(us) & rookSquare))
                 *moveList++ = Move::make<CASTLING>(ksq, rookSquare);
-            }
         }
     }
 
