@@ -480,8 +480,9 @@ void Position::set_extra_bitboards() const {
     st->checkSquares[KING]   = 0;
 
     st->threats[ALL_PIECES]  = 0;
+    Bitboard occ = pieces() ^ square<KING>(sideToMove);
     for (PieceType pt = PAWN; pt <= KING; ++pt)
-        st->threats[ALL_PIECES] |= st->threats[pt] = attacks_by(pt, ~sideToMove);
+        st->threats[ALL_PIECES] |= st->threats[pt] = xattacks_by(pt, ~sideToMove, occ);
 }
 
 

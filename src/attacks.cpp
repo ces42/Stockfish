@@ -188,8 +188,8 @@ void init() {
                 BetweenBB[s1][s2] |= s2;
             }
 
-        DiagBB[s1] = line_mask(s1, NORTH_EAST, SOUTH_WEST);
-        AntiDiagBB[s1] = line_mask(s1, NORTH_WEST, SOUTH_EAST);
+        DiagBB[s1] = line_mask(s1, NORTH_EAST, SOUTH_WEST) | s1;
+        AntiDiagBB[s1] = line_mask(s1, NORTH_WEST, SOUTH_EAST) | s1;
     }
 }
 
