@@ -435,7 +435,7 @@ Position::set(const string& fenStr, bool isChess960, StateInfo* si) {
     chess960 = isChess960;
     set_state();
 
-    if (attackers_to_exist(square<KING>(~sideToMove), pieces(), sideToMove))
+    if (attackers_to(square<KING>(~sideToMove)) & pieces(sideToMove))
         return PositionSetError("Unsupported position. King can be captured.");
 
     assert(pos_is_ok());
@@ -655,14 +655,6 @@ Bitboard Position::attackers_to(Square s, Bitboard occupied) const {
          | (attacks_bb(KNIGHT, s) & pieces(KNIGHT)) | (attacks_bb(KING, s) & pieces(KING));
 }
 
-bool Position::attackers_to_exist(Square s, Bitboard occupied, Color c) const {
-
-    return (attacks_bb(ROOK, s, occupied) & pieces(c, ROOK, QUEEN))
-        || (attacks_bb(BISHOP, s, occupied) & pieces(c, BISHOP, QUEEN))
-        || (attacks_bb(PAWN, s, ~c) & pieces(c, PAWN))
-        || (attacks_bb(KNIGHT, s) & pieces(c, KNIGHT)) || (attacks_bb(KING, s) & pieces(c, KING));
-}
-
 // Takes a random move and tests whether the move is legal. It is used to validate moves
 // from TT that can be corrupted due to SMP concurrent access or hash position key aliasing.
 bool Position::legal(Move m) const {
@@ -709,7 +701,7 @@ bool Position::legal(Move m) const {
         return false;
 
 
-    if (type_of(piece_on(from)) != KING)
+    if (type_of(pc) != KING)
     {
         if (checkers())
         {
@@ -728,7 +720,7 @@ bool Position::legal(Move m) const {
     else
         // If the moving piece is a king, check whether the destination square is
         // attacked by the opponent.
-        return !(attackers_to_exist(to, pieces() ^ from, ~us));
+        return !(to & threats_by(ALL_PIECES));
 }
 
 
@@ -1586,7 +1578,7 @@ bool Position::pos_is_ok() const {
         assert(0 && "pos_is_ok: Default");
 
     if (count<KING>(WHITE) != 1 || count<KING>(BLACK) != 1
-        || attackers_to_exist(square<KING>(~sideToMove), pieces(), sideToMove))
+        || attackers_to(square<KING>(~sideToMove)) & pieces(sideToMove))
         assert(0 && "pos_is_ok: Kings");
 
     if ((pieces(PAWN) & (Rank1BB | Rank8BB)) || count<PAWN>(WHITE) > 8 || count<PAWN>(BLACK) > 8)

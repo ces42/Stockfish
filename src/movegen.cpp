@@ -86,7 +86,7 @@ inline Move* splat_moves(Move* moveList, Square from, Bitboard to_bb) {
 template<GenType Type, Direction D, bool Enemy>
 Move* make_promotions(Move* moveList, [[maybe_unused]] Square to) {
 
-    constexpr bool          all  = Type == EVASIONS;
+    constexpr bool          all  = Type == EVASIONS || Type == LEGAL;
     [[maybe_unused]] Square from = to - D;
 
     if constexpr (Type == CAPTURES || all)

@@ -129,7 +129,6 @@ class Position {
     // Attacks to/from a given square
     Bitboard attackers_to(Square s) const;
     Bitboard attackers_to(Square s, Bitboard occupied) const;
-    bool     attackers_to_exist(Square s, Bitboard occupied, Color c) const;
     void     update_slider_blockers(Color c) const;
     Bitboard xattacks_by(PieceType pt, Color c, Bitboard occupied) const;
     Bitboard threats_by(PieceType pt) const;
@@ -195,7 +194,6 @@ class Position {
     Key  compute_material_key() const;
     void set_state() const;
     void set_extra_bitboards() const;
-    void set_threats() const;
 
     // Other helpers
     template<bool ComputeRay = true>
