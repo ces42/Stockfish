@@ -106,6 +106,8 @@ Move* make_promotions(Move* moveList, [[maybe_unused]] Square to) {
 template<Color Us, GenType Type>
 Move* generate_pawn_moves(const Position& pos, Move* moveList, Bitboard target) {
 
+    static_assert(Type != LEGAL, "Unsupported type in generate_pawn_moves()");
+
     constexpr Color     Them     = ~Us;
     constexpr Bitboard  TRank7BB = (Us == WHITE ? Rank7BB : Rank2BB);
     constexpr Bitboard  TRank3BB = (Us == WHITE ? Rank3BB : Rank6BB);
@@ -300,7 +302,6 @@ template<>
 Move* generate<LEGAL>(const Position& pos, Move* moveList) {
     return pos.checkers() ? generate<EVASIONS>(pos, moveList)
                           : generate<QUIETS>(pos, generate<CAPTURES>(pos, moveList));
-
 }
 
 }  // namespace Stockfish
