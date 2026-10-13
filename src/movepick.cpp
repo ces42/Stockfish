@@ -108,8 +108,11 @@ struct MoveSorter {
 
 // Sort moves in descending order up to and including a given limit.
 // The order of moves smaller than the limit is left unspecified.
-void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
-    ExtMove *sortedEnd = begin, *p = begin + 1;
+void partial_insertion_sort(ExtMove* begin_, ExtMove* end_, int limit) {
+    i64 *begin = reinterpret_cast<i64*>(begin_);
+    i64 *end = reinterpret_cast<i64*>(end_);
+    i64 *sortedEnd = begin;
+    i64 *p = begin + 1;
 
 #ifdef USE_AVX512
     if (begin == end)
@@ -130,16 +133,24 @@ void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
     sorter.write_sorted(begin, sortedEnd - begin + 1);
     // Use scalar implementation for any remaining elements
 #endif
-
+    i64 biglimit = (i64(limit) << 32) - 1;
     for (; p < end; ++p)
-        if (p->value >= limit)
+    {
+        ExtMove* em = reinterpret_cast<ExtMove*>(p);
+        assert (*p >> 32 == em->value);
+        u32 plow = *p & ((1ULL << 32) - 1);
+        assert(popcount(plow) <= 16);
+        assert( !(plow & ~((1U << 16) - 1)) );
+        assert (plow == em->raw());
+        if (*p > biglimit)
         {
-            ExtMove tmp = *p, *q;
+            i64 tmp = *p, *q;
             *p          = *++sortedEnd;
             for (q = sortedEnd; q != begin && *(q - 1) < tmp; --q)
                 *q = *(q - 1);
             *q = tmp;
         }
+    }
 }
 
 }  // namespace

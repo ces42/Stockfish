@@ -20,6 +20,7 @@
 #define MOVEGEN_H_INCLUDED
 
 #include <algorithm>  // IWYU pragma: keep
+#include <cstring>
 
 #include "misc.h"
 #include "types.h"
@@ -35,18 +36,27 @@ enum GenType {
     ALL
 };
 
-struct ExtMove: public Move {
+struct alignas(8) ExtMove: public Move {
+    u16 pad;
     int value;
 
-    void operator=(Move m) { data = m.raw(); }
+    void operator=(Move m) { data = m.raw(); pad = 0;}
 
     // Inhibit unwanted implicit conversions to Move
     // with an ambiguity that yields to a compile error.
     operator float() const = delete;
 };
 
-inline bool operator<(const ExtMove& f, const ExtMove& s) { return f.value < s.value; }
-
+// inline bool operator<(const ExtMove& f, const ExtMove& s) {
+//     i64 x, y;
+//     std::memcpy(&x, &f, 8);
+//     std::memcpy(&y, &s, 8);
+//     assert (x >> 32 == f.value);
+//     assert (x & ((1ULL << 32) - 1) == f.raw());
+//     // return (x & ((-1ULL) << 32)) < (y & ((-1ULL) << 32));
+//     return (x >> 32) < (y >> 32);
+// }
+//
 template<GenType>
 Move* generate(const Position& pos, Move* moveList);
 
