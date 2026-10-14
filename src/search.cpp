@@ -914,20 +914,23 @@ Value Search::Worker::search(
             // For high rule50 counts don't produce transposition table cutoffs.
             if (pos.rule50_count() < 96)
             {
-                if (depth >= 7 && ttData.move && pos.legal(ttData.move)
-                    && !is_decisive(ttData.value))
+                if (depth >= 7 && ttData.move && !is_decisive(ttData.value))
                 {
-                    pos.do_move(ttData.move, st);
-                    Key nextPosKey                             = pos.key();
-                    auto [ttHitNext, ttDataNext, ttWriterNext] = tt.probe(nextPosKey);
-                    pos.undo_move(ttData.move);
+                    pos.set_threat_bitboards();
+                    if (pos.legal(ttData.move))
+                    {
+                        pos.do_move(ttData.move, st);
+                        Key nextPosKey                             = pos.key();
+                        auto [ttHitNext, ttDataNext, ttWriterNext] = tt.probe(nextPosKey);
+                        pos.undo_move(ttData.move);
 
-                    // Check that the ttValue after the tt move would also trigger a cutoff
-                    if (!is_valid(ttDataNext.value))
-                        return ttData.value;
+                        // Check that the ttValue after the tt move would also trigger a cutoff
+                        if (!is_valid(ttDataNext.value))
+                            return ttData.value;
 
-                    if ((ttData.value >= beta) == (-ttDataNext.value >= beta))
-                        return ttData.value;
+                        if ((ttData.value >= beta) == (-ttDataNext.value >= beta))
+                            return ttData.value;
+                    }
                 }
                 else
                     return ttData.value;
@@ -2389,6 +2392,7 @@ bool RootMove::extract_ponder_from_tt(const TranspositionTable& tt, Position& po
     if (!pos.is_draw(1))
     {
         auto [ttHit, ttData, ttWriter] = tt.probe(pos.key());
+        pos.set_threat_bitboards();
         if (ttHit && ttData.move && pos.legal(ttData.move))
             pv.push_back(ttData.move);
     }

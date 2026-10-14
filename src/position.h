@@ -63,6 +63,7 @@ struct StateInfo {
     Bitboard   pinners[COLOR_NB];
     Bitboard   checkSquares[PIECE_TYPE_NB];
     Bitboard   threats[PIECE_TYPE_NB];
+    bool       threats_set;
     Piece      capturedPiece;
     int        repetition;
 };
@@ -187,6 +188,7 @@ class Position {
     void put_piece(Piece pc, Square s, DirtyThreats* const dts = nullptr);
     void remove_piece(Square s, DirtyThreats* const dts = nullptr);
     void swap_piece(Square s, Piece pc, DirtyThreats* const dts = nullptr);
+    void set_threat_bitboards() const;
 
    private:
     // Initialization helpers (used while setting up a position)

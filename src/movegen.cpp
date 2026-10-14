@@ -303,6 +303,7 @@ template Move* generate<EVASIONS>(const Position&, Move*);
 
 template<>
 Move* generate<ALL>(const Position& pos, Move* moveList) {
+    pos.set_threat_bitboards();
     return pos.checkers() ? generate<EVASIONS>(pos, moveList)
                           : generate<QUIETS>(pos, generate<CAPTURES>(pos, moveList));
 }

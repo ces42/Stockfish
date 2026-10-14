@@ -479,6 +479,12 @@ void Position::set_extra_bitboards() const {
     st->checkSquares[QUEEN]  = st->checkSquares[BISHOP] | st->checkSquares[ROOK];
     st->checkSquares[KING]   = 0;
 
+    st->threats_set = false;
+}
+
+void Position::set_threat_bitboards() const {
+    if (st->threats_set)
+        return;
     Bitboard occ            = pieces() ^ square<KING>(sideToMove);
     st->threats[ALL_PIECES] = st->threats[PAWN]    = xattacks_by(PAWN, ~sideToMove, occ);
     st->threats[ALL_PIECES] |= st->threats[KNIGHT] = xattacks_by(KNIGHT, ~sideToMove, occ);
@@ -486,6 +492,7 @@ void Position::set_extra_bitboards() const {
     st->threats[ALL_PIECES] |= st->threats[ROOK]   = xattacks_by(ROOK, ~sideToMove, occ);
     st->threats[ALL_PIECES] |= st->threats[QUEEN]  = xattacks_by(QUEEN, ~sideToMove, occ);
     st->threats[ALL_PIECES] |= st->threats[KING]   = xattacks_by(KING, ~sideToMove, occ);
+    st->threats_set = true;
 }
 
 
@@ -662,6 +669,7 @@ Bitboard Position::attackers_to(Square s, Bitboard occupied) const {
 // from TT that can be corrupted due to SMP concurrent access or hash position key aliasing.
 bool Position::legal(Move m) const {
 
+    assert(st->threats_set);
     Color  us   = sideToMove;
     Square from = m.from_sq();
     Square to   = m.to_sq();
