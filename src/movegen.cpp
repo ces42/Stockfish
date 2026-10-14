@@ -253,10 +253,13 @@ Move* generate_all(const Position& pos, Move* moveList, Color us) {
     if constexpr (Type == EVASIONS)
         target = ~pos.pieces(us);
 
-    target &= ~pos.threats_by(ALL_PIECES);
-
     Bitboard b = Attacks::attacks_bb(KING, ksq) & target;
-    moveList   = splat_moves(moveList, ksq, b);
+    if (Type == QUIETS || b)
+    {
+        pos.set_threat_bitboards();
+        b &= ~pos.threats_by(ALL_PIECES);
+        moveList = splat_moves(moveList, ksq, b);
+    }
 
     if (Type == QUIETS && pos.can_castle(us & ANY_CASTLING))
     {

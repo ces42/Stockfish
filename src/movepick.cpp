@@ -169,7 +169,9 @@ MovePicker::MovePicker(const Position&              p,
     depth(d),
     ply(pl) {
 
-    pos.set_threat_bitboards();
+    if (ttm && type_of(pos.moved_piece(ttm)) == KING)
+        pos.set_threat_bitboards();
+
     if (pos.checkers())
         stage = EVASION_TT + !(ttm && pos.legal(ttm));
 
@@ -186,7 +188,8 @@ MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceTo
     threshold(th) {
     assert(!pos.checkers());
 
-    pos.set_threat_bitboards();
+    if (ttm && type_of(pos.moved_piece(ttm)) == KING)
+        pos.set_threat_bitboards();
 
     stage = PROBCUT_TT + !(ttm && pos.capture_stage(ttm) && pos.legal(ttm));
 }
