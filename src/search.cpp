@@ -1841,8 +1841,8 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
                 }
             }
 
-            // Skip non-captures
-            if (!capture)
+            // Skip non-captures, but never skip tt move
+            if (!capture && ss->inCheck)
                 continue;
 
             // Do not search moves with bad enough SEE values
