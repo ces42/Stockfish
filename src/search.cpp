@@ -1033,7 +1033,6 @@ Value Search::Worker::search(
 
     // Step 10. Null move search with verification search
     if (cutNode
-        && ss->staticEval + 50 * ss->priorNMPFailHigh >= beta - 13 * depth - 47 * improving + 365
         && !excludedMove && pos.non_pawn_material(us) && ss->ply >= nmpMinPly && beta >= -2000)
     {
         assert((ss - 1)->currentMove != Move::null());
@@ -1047,30 +1046,33 @@ Value Search::Worker::search(
 
         undo_null_move(pos);
 
-        // Do not return unproven mate or TB scores
-        if (nullValue >= beta && !is_win(nullValue))
+        if(ss->staticEval + 50 * ss->priorNMPFailHigh >= beta - 13 * depth - 47 * improving + 365)
         {
-            if (nmpMinPly || depth < 16)
+            // Do not return unproven mate or TB scores
+            if (nullValue >= beta && !is_win(nullValue))
             {
-                ++ss->priorNMPFailHigh;
-                return nullValue;
-            }
+                if (nmpMinPly || depth < 16)
+                {
+                    ++ss->priorNMPFailHigh;
+                    return nullValue;
+                }
 
-            // Recursive verification is not allowed
-            assert(!nmpMinPly);
+                // Recursive verification is not allowed
+                assert(!nmpMinPly);
 
-            // Do verification search at high depths, with null move pruning
-            // disabled until ply exceeds nmpMinPly.
-            nmpMinPly = ss->ply + 3 * (depth - R) / 4;
+                // Do verification search at high depths, with null move pruning
+                // disabled until ply exceeds nmpMinPly.
+                nmpMinPly = ss->ply + 3 * (depth - R) / 4;
 
-            Value v = search<NonPV>(pos, ss, beta - 1, beta, depth - R, false);
+                Value v = search<NonPV>(pos, ss, beta - 1, beta, depth - R, false);
 
-            nmpMinPly = 0;
+                nmpMinPly = 0;
 
-            if (v >= beta)
-            {
-                ++ss->priorNMPFailHigh;
-                return nullValue;
+                if (v >= beta)
+                {
+                    ++ss->priorNMPFailHigh;
+                    return nullValue;
+                }
             }
         }
     }
