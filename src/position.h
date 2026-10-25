@@ -45,9 +45,9 @@ struct StateInfo {
 
     // Copied when making a move
     Key    materialKey;
-    Key    pawnKey;
-    Key    minorPieceKey;
-    Key    nonPawnKey[COLOR_NB];
+    u32    pawnKey;
+    u32    minorPieceKey;
+    u32    nonPawnKey[COLOR_NB];
     Value  nonPawnMaterial[COLOR_NB];
     int    castlingRights;
     int    rule50;
@@ -158,9 +158,9 @@ class Position {
     Key key() const;
     Key prefetch_key(Move m) const;
     Key material_key() const;
-    Key pawn_key() const;
-    Key minor_piece_key() const;
-    Key non_pawn_key(Color c) const;
+    u32 pawn_key() const;
+    u32 minor_piece_key() const;
+    u32 non_pawn_key(Color c) const;
 
     // Other properties of the position
     Color side_to_move() const;
@@ -327,13 +327,13 @@ inline Key Position::adjust_key50(Key k) const {
     return st->rule50 < 14 - AfterMove ? k : k ^ make_key((st->rule50 - (14 - AfterMove)) / 8);
 }
 
-inline Key Position::pawn_key() const { return st->pawnKey; }
+inline u32 Position::pawn_key() const { return st->pawnKey; }
 
 inline Key Position::material_key() const { return st->materialKey; }
 
-inline Key Position::minor_piece_key() const { return st->minorPieceKey; }
+inline u32 Position::minor_piece_key() const { return st->minorPieceKey; }
 
-inline Key Position::non_pawn_key(Color c) const { return st->nonPawnKey[c]; }
+inline u32 Position::non_pawn_key(Color c) const { return st->nonPawnKey[c]; }
 
 inline Value Position::non_pawn_material(Color c) const { return st->nonPawnMaterial[c]; }
 
