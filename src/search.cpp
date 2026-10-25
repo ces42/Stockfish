@@ -1033,7 +1033,6 @@ Value Search::Worker::search(
 
     // Step 10. Null move search with verification search
     if (cutNode
-        && ss->staticEval + 50 * ss->priorNMPFailHigh >= beta - 13 * depth - 47 * improving + 365
         && !excludedMove && pos.non_pawn_material(us) && ss->ply >= nmpMinPly && beta >= -2000)
     {
         assert((ss - 1)->currentMove != Move::null());
@@ -1043,8 +1042,16 @@ Value Search::Worker::search(
         R -= seekMate * R / 2;
         do_null_move(pos, st, ss);
 
-        Value nullValue = -search<NonPV>(pos, ss + 1, -beta, -beta + 1, depth - R, false);
+        Key flipPosKey                             = pos.key();
+        auto [ttHitFlip, ttDataFlip, ttWriterFlip] = tt.probe(flipPosKey);
 
+        bool nmpCheap = ttHitFlip
+                        && ttDataFlip.depth > depth - R - (ttDataFlip.value <= -beta + 1)
+                        && (ttDataFlip.bound & (ttDataFlip.value >= -beta + 1 ? BOUND_LOWER : BOUND_UPPER));
+
+        if (ss->staticEval + 50 * ss->priorNMPFailHigh >= beta - 13 * depth - 47 * improving + 365 - 100*nmpCheap)
+        {
+        Value nullValue = -search<NonPV>(pos, ss + 1, -beta, -beta + 1, depth - R, false);
         undo_null_move(pos);
 
         // Do not return unproven mate or TB scores
@@ -1073,6 +1080,8 @@ Value Search::Worker::search(
                 return nullValue;
             }
         }
+        } else 
+            undo_null_move(pos);
     }
 
     improving |= ss->staticEval >= beta;
