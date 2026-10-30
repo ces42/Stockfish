@@ -316,7 +316,7 @@ dispatch:
             cur    = endBadMoves;
             endCur = generate_and_score<QUIETS>();
 
-            partial_insertion_sort(cur, endCur, goodQuietThreshold);
+            partial_insertion_sort(cur, endCur, goodQuietThreshold + 1);
 
             stage = GOOD_QUIET;
             [[fallthrough]];
@@ -334,8 +334,8 @@ dispatch:
         // Prepare the pointers to loop over the bad captures
         cur    = moves;
         endCur = endBadMoves;
-        if (!skipQuiets)
-            partial_insertion_sort(endBadCaptures, endBadMoves);
+        if (!skipQuiets && depth >= 4)
+            partial_insertion_sort(endBadCaptures, endBadMoves, -3560 * depth);
 
         stage = BAD_MOVES;
         [[fallthrough]];
