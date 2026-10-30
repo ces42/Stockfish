@@ -33,7 +33,8 @@ enum Stages : i8 {
 
     GOOD_CAPTURE,
     GOOD_QUIET,
-    BAD_MOVES,
+    BAD_CAPTURES,
+    BAD_QUIETS,
 
     QSEARCH,
 
@@ -100,11 +101,11 @@ struct MoveSorter {
 
 // Sort moves in descending order up to and including a given limit.
 // The order of moves smaller than the limit is left unspecified.
-void partial_insertion_sort(ExtMove* begin, ExtMove* end,
+ExtMove* partial_insertion_sort(ExtMove* begin, ExtMove* end,
                             int limit = std::numeric_limits<int>::min()) {
 
-    if (end - begin <= 1)
-        return;
+    if (begin == end)
+        return begin;
 
     ExtMove *sortedEnd = begin, *p = begin + 1;
 
@@ -134,6 +135,9 @@ void partial_insertion_sort(ExtMove* begin, ExtMove* end,
                 *q = *(q - 1);
             *q = tmp;
         }
+
+    // The first move is always sorted, even if it is below the limit.
+    return sortedEnd->value >= limit ? sortedEnd + 1 : sortedEnd;
 }
 
 }  // namespace
@@ -287,7 +291,7 @@ dispatch:
         return ttMove;
 
     case INIT_FIRST_STAGE :
-        cur = endBadMoves = moves;
+        cur = endBadCaptures = moves;
 
         if (first_stage == EVASION)
             endCur = generate_and_score<EVASIONS>();
@@ -303,44 +307,50 @@ dispatch:
         if (Move move = select([&]() {
                 if (pos.see_ge(*cur, -cur->value / 18))
                     return true;
-                *endBadMoves++ = *cur;
+                *endBadCaptures++ = *cur;
                 return false;
             }))
             return move;
 
-        endBadCaptures = endBadMoves;
-
         if (!skipQuiets)
         {
             // initialize quiet moves
-            cur    = endBadMoves;
-            endCur = generate_and_score<QUIETS>();
+            cur         = endBadCaptures;
+            endQuiets = generate_and_score<QUIETS>();
 
-            partial_insertion_sort(cur, endCur, goodQuietThreshold + 1);
+            endCur = endGoodQuiets = partial_insertion_sort(cur, endQuiets, goodQuietThreshold + 1);
 
             stage = GOOD_QUIET;
             [[fallthrough]];
 
-        case GOOD_QUIET :
-            if (Move move = select([&]() {
-                    if (cur->value > goodQuietThreshold)
-                        return true;
-                    *endBadMoves++ = *cur;
-                    return false;
-                }))
+    case GOOD_QUIET :
+            if (Move move = select([]() { return true; }))
                 return move;
         }
 
-        // Prepare the pointers to loop over the bad captures
-        cur    = moves;
-        endCur = endBadMoves;
-        if (!skipQuiets && depth >= 4)
-            partial_insertion_sort(endBadCaptures, endBadMoves, -3560 * depth);
+        // Save the start of bad quiets while selecting the bad captures.
+        endCur = endBadCaptures;
+        cur = moves;
 
-        stage = BAD_MOVES;
+        stage = BAD_CAPTURES;
         [[fallthrough]];
 
-    case BAD_MOVES :
+    case BAD_CAPTURES :
+        if (Move mov = select([]() { return true; }))
+            return mov;
+
+        if (skipQuiets)
+            return Move::none();
+
+        cur    = endGoodQuiets;
+        endCur = endQuiets;
+        if (depth >= 4)
+            partial_insertion_sort(cur, endCur, -3560 * depth);
+
+        stage = BAD_QUIETS;
+        [[fallthrough]];
+
+    case BAD_QUIETS :
     case QSEARCH :
     case EVASION :
         return select([]() { return true; });
@@ -356,8 +366,8 @@ dispatch:
 
 void MovePicker::skip_quiet_moves() {
     skipQuiets = true;
-    if (stage == BAD_MOVES || stage == GOOD_QUIET)
-        endCur = endBadMoves = endBadCaptures;  // discards current-stage and bad quiet moves
+    if (stage == BAD_QUIETS || stage == GOOD_QUIET)
+        endCur = cur;  // discards quiet moves in the current stage
 }
 
 }  // namespace Stockfish
