@@ -100,7 +100,8 @@ struct MoveSorter {
 
 // Sort moves in descending order up to and including a given limit.
 // The order of moves smaller than the limit is left unspecified.
-void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
+void partial_insertion_sort(ExtMove* begin, ExtMove* end,
+                            int limit = std::numeric_limits<int>::min()) {
 
     if (end - begin <= 1)
         return;
@@ -293,7 +294,7 @@ dispatch:
         else
             endCur = generate_and_score<CAPTURES>();
 
-        partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
+        partial_insertion_sort(cur, endCur);
 
         stage = first_stage;
         goto dispatch;
@@ -315,7 +316,7 @@ dispatch:
             cur    = endBadMoves;
             endCur = generate_and_score<QUIETS>();
 
-            partial_insertion_sort(cur, endCur, -3560 * depth);
+            partial_insertion_sort(cur, endCur, goodQuietThreshold);
 
             stage = GOOD_QUIET;
             [[fallthrough]];
@@ -333,6 +334,8 @@ dispatch:
         // Prepare the pointers to loop over the bad captures
         cur    = moves;
         endCur = endBadMoves;
+        if (!skipQuiets)
+            partial_insertion_sort(endBadCaptures, endBadMoves);
 
         stage = BAD_MOVES;
         [[fallthrough]];
