@@ -59,13 +59,6 @@ void update_accumulator_refresh_cache(Color                     perspective,
                                       AccumulatorState&         accumulatorState,
                                       AccumulatorCaches&        cache);
 
-void update_accumulator_hybrid(Color                     perspective,
-                               const Position&           pos,
-                               const FeatureTransformer& featureTransformer,
-                               AccumulatorState&         target,
-                               const AccumulatorState&   computed,
-                               AccumulatorCaches&        cache);
-
 }
 
 const AccumulatorState& AccumulatorStack::latest() const noexcept { return accumulators[size - 1]; }
@@ -118,29 +111,11 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
                                      AccumulatorCaches&        cache,
                                      usize                     last_usable_accum) noexcept {
 
-    constexpr int MIN_PC_COUNT_HYBRID = 15;
-
     if (accumulators[last_usable_accum].computed[perspective])
         forward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
 
     else
     {
-        const auto& dirtyPiece = latest().dirtyPiece;
-        const auto  after      = PSQFeatureSet::block_state(pos);
-        const auto& before     = latest().blockBefore;
-
-        if (dirtyPiece.pc == make_piece(perspective, KING)
-            && PSQFeatureSet::block(before, perspective) == PSQFeatureSet::block(after, perspective)
-            && accumulators[size - 2].computed[perspective]
-            && pos.count<ALL_PIECES>() >= MIN_PC_COUNT_HYBRID
-            && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
-            && dirtyPiece.add_sq == SQ_NONE)  // excludes castling
-        {
-            update_accumulator_hybrid(perspective, pos, featureTransformer, mut_latest(),
-                                      accumulators[size - 2], cache);
-            return;
-        }
-
         update_accumulator_refresh_cache(perspective, featureTransformer, pos, mut_latest(), cache);
         backward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
     }
@@ -785,106 +760,6 @@ sf_always_inline void append_changed_psq_indices(Color                          
 #endif
 }
 
-// Updates accumulator for a king move, and also updates the accumulator cache
-// for the new king position.
-void update_accumulator_hybrid(Color                     perspective,
-                               const Position&           pos,
-                               const FeatureTransformer& featureTransformer,
-                               AccumulatorState&         target,
-                               const AccumulatorState&   computed,
-                               AccumulatorCaches&        cache) {
-    const auto& dirtyPiece = target.dirtyPiece;
-
-    assert(dirtyPiece.pc == make_piece(perspective, KING));
-    assert(dirtyPiece.to != SQ_NONE);
-    assert((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100));
-    assert(computed.computed[perspective]);
-    assert(!target.computed[perspective]);
-
-    const Square oldKsq = dirtyPiece.from;
-    const Square newKsq = dirtyPiece.to;
-    assert(oldKsq != newKsq);
-
-    const auto& currentPieces  = pos.piece_array();
-    auto        previousPieces = currentPieces;  // copies 64 bytes!
-
-    Bitboard previousPieceBB = pos.pieces();
-
-    assert(previousPieces[newKsq] == dirtyPiece.pc);
-
-    if (dirtyPiece.remove_sq != SQ_NONE)
-    {
-        assert(dirtyPiece.remove_sq == newKsq);
-        previousPieces[newKsq] = dirtyPiece.remove_pc;
-    }
-    else
-    {
-        previousPieces[newKsq] = NO_PIECE;
-        previousPieceBB &= ~square_bb(newKsq);
-    }
-
-    assert(previousPieces[oldKsq] == NO_PIECE);
-    previousPieces[oldKsq] = make_piece(perspective, KING);
-    previousPieceBB |= square_bb(oldKsq);
-
-    const int   psqBlock   = PSQFeatureSet::block(pos, perspective);
-    const auto& oldEntry   = cache[psqBlock][oldKsq][perspective];
-    auto&       newEntry   = cache[psqBlock][newKsq][perspective];
-    const auto* psqWeights = featureTransformer.psq_weights(psqBlock);
-
-    // "Remove" means we need to remove them from the cache entry,
-    // "Add" means add them to the entry to get the accumulator we want
-    PSQFeatureSet::IndexList oldRemove, oldAdd, newRemove, newAdd;
-
-    append_changed_psq_indices(perspective, oldKsq, oldEntry.pieces, oldEntry.pieceBB,
-                               previousPieces, previousPieceBB, oldRemove, oldAdd);
-    append_changed_psq_indices(perspective, newKsq, newEntry.pieces, newEntry.pieceBB,
-                               currentPieces, pos.pieces(), newRemove, newAdd);
-
-    ThreatFeatureSet::IndexList thrRemoved, thrAdded;  // also contain pp indices
-    const auto*                 threatPpBase = &featureTransformer.threatAndPpWeights[0];
-    IndexType                   pfStride     = FeatureTransformer::OutputDimensions;
-    ThreatFeatureSet::append_changed_indices(perspective, newKsq, target.dirtyThreats, thrRemoved,
-                                             thrAdded, threatPpBase, pfStride);
-    PairFeatureSet::append_changed_indices(perspective, newKsq, target.dirtyPawnPairs, thrRemoved,
-                                           thrAdded, threatPpBase, pfStride);
-
-    const auto& fromAcc = computed.accumulation[perspective];
-    auto&       toAcc   = target.accumulation[perspective];
-
-    Tile acc;
-
-    for (IndexType j = 0; j < Dimensions; increment_index(j))
-    {
-        acc = load_tile(j, newEntry.accumulation.data());
-
-        acc = apply_psq_features<-1>(j, acc, newRemove, psqWeights);
-        acc = apply_psq_features<+1>(j, acc, newAdd, psqWeights);
-
-        store_tile(j, newEntry.accumulation.data(), acc);
-
-        // adding the old accumulator adds (most of) the threats and pp weights that we need
-        acc = apply<1>(j, acc, &fromAcc[j]);
-        // But we have added a whole bunch of psq weights for the wrong king bucket which
-        // we need to remove
-        // first we remove the cached psq accumulation for the old king position...
-        acc = apply<-1>(j, acc, &oldEntry.accumulation[j]);
-
-        // ... then we adjust
-        // The old entry's removed psq features have to be added back, its added ones removed
-        acc =
-          apply_combined_features<-1>(j, acc, oldAdd, thrRemoved, featureTransformer, psqWeights);
-        acc =
-          apply_combined_features<+1>(j, acc, oldRemove, thrAdded, featureTransformer, psqWeights);
-
-        store_tile(j, toAcc.data(), acc);
-    }
-
-    newEntry.pieces  = currentPieces;
-    newEntry.pieceBB = pos.pieces();
-
-    target.computed[perspective] = true;
-}
 
 // HalfKA data comes from the Finny table entry, while the threats are built
 // from the active threat features
