@@ -118,7 +118,7 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
                                      AccumulatorCaches&        cache,
                                      usize                     last_usable_accum) noexcept {
 
-    constexpr int MIN_PC_COUNT_HYBRID = 12;
+    constexpr int MIN_PC_COUNT_HYBRID = 18;
 
     if (accumulators[last_usable_accum].computed[perspective])
         forward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
