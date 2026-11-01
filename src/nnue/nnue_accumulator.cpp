@@ -816,6 +816,9 @@ void update_accumulator_hybrid(Color                     perspective,
 
     if (dirtyPiece.remove_sq != SQ_NONE)
     {
+        // this assert is correct, but we don't rely on it
+        // assert(dirtyPiece.remove_sq == dirtyPiece.to)
+        // we could use that fact to save a bit duplicate work, but it seems like it's not worth it
         previousPieces[dirtyPiece.remove_sq] = dirtyPiece.remove_pc;
         previousPieceBB |= square_bb(dirtyPiece.remove_sq);
     }
