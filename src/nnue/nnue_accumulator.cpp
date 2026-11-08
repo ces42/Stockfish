@@ -118,7 +118,11 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
                                      AccumulatorCaches&        cache,
                                      usize                     last_usable_accum) noexcept {
 
+#ifdef USE_AVX512
+    constexpr int MIN_PC_COUNT_HYBRID = 15;
+#else
     constexpr int MIN_PC_COUNT_HYBRID = 12;
+#endif
 
     if (accumulators[last_usable_accum].computed[perspective])
         forward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
