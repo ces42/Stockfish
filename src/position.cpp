@@ -49,7 +49,7 @@ namespace Zobrist {
 Key psq[PIECE_NB][SQUARE_NB];
 Key enpassant[FILE_NB];
 Key castling[CASTLING_RIGHT_NB];
-Key side = 1ULL, noPawns;
+Key side = 1ULL;
 
 }
 
@@ -132,8 +132,6 @@ void Position::init() {
 
     for (int cr = NO_CASTLING; cr <= ANY_CASTLING; ++cr)
         Zobrist::castling[cr] = rng.rand<Key>() << 1;
-
-    Zobrist::noPawns = rng.rand<Key>() << 1;
 
     // Prepare the cuckoo tables
     cuckoo.fill(0);
@@ -496,7 +494,7 @@ void Position::set_state() const {
     st->key               = sideToMove;
     st->minorPieceKey     = 0ULL;
     st->nonPawnKey[WHITE] = st->nonPawnKey[BLACK] = 0ULL;
-    st->pawnKey           = Zobrist::noPawns;
+    st->pawnKey           = 0ULL;
     st->nonPawnMaterial[WHITE] = st->nonPawnMaterial[BLACK] = VALUE_ZERO;
     st->checkersBB = attackers_to(square<KING>(sideToMove)) & pieces(~sideToMove);
 
