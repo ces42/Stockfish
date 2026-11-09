@@ -494,9 +494,9 @@ void Position::compute_threats() const {
 void Position::set_state() const {
 
     st->key               = sideToMove;
-    st->minorPieceKey     = sideToMove;
-    st->nonPawnKey[WHITE] = st->nonPawnKey[BLACK] = sideToMove;
-    st->pawnKey           = Zobrist::noPawns ^ sideToMove;
+    st->minorPieceKey     = 0ULL;
+    st->nonPawnKey[WHITE] = st->nonPawnKey[BLACK] = 0ULL;
+    st->pawnKey           = Zobrist::noPawns;
     st->nonPawnMaterial[WHITE] = st->nonPawnMaterial[BLACK] = VALUE_ZERO;
     st->checkersBB = attackers_to(square<KING>(sideToMove)) & pieces(~sideToMove);
 
@@ -788,10 +788,6 @@ void Position::do_move(
     std::memcpy(&newSt, st, offsetof(StateInfo, key));
     newSt.previous = st;
     st             = &newSt;
-    st->pawnKey ^= Zobrist::side;
-    st->minorPieceKey ^= Zobrist::side;
-    st->nonPawnKey[WHITE] ^= Zobrist::side;
-    st->nonPawnKey[BLACK] ^= Zobrist::side;
 
     // Increment ply counters. In particular, rule50 will be reset to zero later on
     // in case of a capture or a pawn move.
@@ -1315,10 +1311,6 @@ void Position::do_null_move(StateInfo& newSt) {
     }
 
     st->key ^= Zobrist::side;
-    st->pawnKey ^= Zobrist::side;
-    st->minorPieceKey ^= Zobrist::side;
-    st->nonPawnKey[WHITE] ^= Zobrist::side;
-    st->nonPawnKey[BLACK] ^= Zobrist::side;
 
     st->pliesFromNull = 0;
 
