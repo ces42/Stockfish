@@ -160,7 +160,7 @@ struct CorrectionBundle {
     StatsEntry<T, D, true> nonPawnWhite;
     StatsEntry<T, D, true> nonPawnBlack;
 
-    void operator=(T val) {
+    void fill(T val) {
         pawn         = val;
         minor        = val;
         nonPawnWhite = val;
@@ -186,8 +186,7 @@ struct CorrHistTypedef<Continuation> {
 }
 
 using UnifiedCorrectionHistory =
-  DynStats<MultiArray<CorrectionBundle<i16, CORRECTION_HISTORY_LIMIT>, COLOR_NB>,
-           CORRHIST_BASE_SIZE>;
+  DynStats<CorrectionBundle<i16, CORRECTION_HISTORY_LIMIT>, CORRHIST_BASE_SIZE>;
 
 template<CorrHistType T>
 using CorrectionHistory = typename Detail::CorrHistTypedef<T>::type;

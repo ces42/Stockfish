@@ -49,7 +49,7 @@ namespace Zobrist {
 Key psq[PIECE_NB][SQUARE_NB];
 Key enpassant[FILE_NB];
 Key castling[CASTLING_RIGHT_NB];
-Key side, noPawns;
+Key side = 1ULL, noPawns;
 
 }
 
@@ -133,8 +133,7 @@ void Position::init() {
     for (int cr = NO_CASTLING; cr <= ANY_CASTLING; ++cr)
         Zobrist::castling[cr] = rng.rand<Key>() << 1;
 
-    Zobrist::side    = 1ULL;
-    Zobrist::noPawns = rng.rand<Key>();
+    Zobrist::noPawns = rng.rand<Key>() << 1;
 
     // Prepare the cuckoo tables
     cuckoo.fill(0);
@@ -494,9 +493,9 @@ void Position::compute_threats() const {
 // The function is only used when a new position is set up
 void Position::set_state() const {
 
-    st->key               = 0;
-    st->minorPieceKey     = 0;
-    st->nonPawnKey[WHITE] = st->nonPawnKey[BLACK] = 0;
+    st->key               = sideToMove;
+    st->minorPieceKey     = sideToMove;
+    st->nonPawnKey[WHITE] = st->nonPawnKey[BLACK] = sideToMove;
     st->pawnKey                                   = Zobrist::noPawns;
     st->nonPawnMaterial[WHITE] = st->nonPawnMaterial[BLACK] = VALUE_ZERO;
     st->checkersBB = attackers_to(square<KING>(sideToMove)) & pieces(~sideToMove);
@@ -528,9 +527,6 @@ void Position::set_state() const {
 
     if (st->epSquare != SQ_NONE)
         st->key ^= Zobrist::enpassant[file_of(st->epSquare)];
-
-    if (sideToMove == BLACK)
-        st->key ^= Zobrist::side;
 
     st->key ^= Zobrist::castling[st->castlingRights];
     st->materialKey = compute_material_key();
@@ -792,6 +788,10 @@ void Position::do_move(
     std::memcpy(&newSt, st, offsetof(StateInfo, key));
     newSt.previous = st;
     st             = &newSt;
+    st->pawnKey ^= Zobrist::side;
+    st->minorPieceKey ^= Zobrist::side;
+    st->nonPawnKey[WHITE] ^= Zobrist::side;
+    st->nonPawnKey[BLACK] ^= Zobrist::side;
 
     // Increment ply counters. In particular, rule50 will be reset to zero later on
     // in case of a capture or a pawn move.
