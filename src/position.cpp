@@ -496,7 +496,7 @@ void Position::set_state() const {
     st->key               = sideToMove;
     st->minorPieceKey     = sideToMove;
     st->nonPawnKey[WHITE] = st->nonPawnKey[BLACK] = sideToMove;
-    st->pawnKey                                   = Zobrist::noPawns;
+    st->pawnKey           = Zobrist::noPawns ^ sideToMove;
     st->nonPawnMaterial[WHITE] = st->nonPawnMaterial[BLACK] = VALUE_ZERO;
     st->checkersBB = attackers_to(square<KING>(sideToMove)) & pieces(~sideToMove);
 
@@ -1315,6 +1315,10 @@ void Position::do_null_move(StateInfo& newSt) {
     }
 
     st->key ^= Zobrist::side;
+    st->pawnKey ^= Zobrist::side;
+    st->minorPieceKey ^= Zobrist::side;
+    st->nonPawnKey[WHITE] ^= Zobrist::side;
+    st->nonPawnKey[BLACK] ^= Zobrist::side;
 
     st->pliesFromNull = 0;
 
