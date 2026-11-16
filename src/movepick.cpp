@@ -354,8 +354,7 @@ dispatch:
 
         cur    = endGoodQuiets;
         endCur = endQuiets;
-        if (depth >= 4)
-            partial_insertion_sort(cur, endCur, -4000 * depth);
+        partial_insertion_sort(cur, endCur, std::min(-18000, -4000 * depth));
 
         stage = BAD_QUIETS;
         [[fallthrough]];
