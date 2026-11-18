@@ -30,6 +30,7 @@
 #include <sstream>
 #include <string_view>
 
+#include "attacks.h"
 #include "bitboard.h"
 #include "history.h"
 #include "misc.h"
@@ -1443,6 +1444,16 @@ bool Position::see_ge(Move m, int threshold) const {
     swap = PieceValue[piece_on(from)] - swap;
     if (swap <= 0)
         return true;
+
+    // If the piece P is blocking the sniper S from attacking the enemy king k then the ray 
+    // along which S is shooting looks like S---P--k-. Thus, if moving P captures a piece p,
+    // p is not along that ray, so we have a discovered check.
+    // In this case P can only be legally recaptured by k
+    if (blockers_for_king(~sideToMove) & from && piece_on(to) != NO_PIECE)
+        if (!(king_attack(square<KING>(~sideToMove)) & to))
+            return true; // cannot recapture
+        // else
+        //     attackers = ...
 
     assert(color_of(piece_on(from)) == sideToMove);
     Bitboard occupied  = pieces() ^ from ^ to;  // xoring to is important for pinned piece logic
