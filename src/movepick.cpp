@@ -319,30 +319,27 @@ dispatch:
 
         endBadCaptures = endBadMoves;
 
-        if (!skipQuiets)
-        {
-            // initialize quiet moves
-            cur    = endBadMoves;
-            endCur = generate_and_score<QUIETS>();
+        // initialize quiet moves
+        cur    = endBadMoves;
+        endCur = generate_and_score<QUIETS>();
 
-            partial_insertion_sort(cur, endCur, -3560 * depth);
+        partial_insertion_sort(cur, endCur, -3560 * depth);
 
-            stage = GOOD_QUIET;
-            [[fallthrough]];
+        stage = GOOD_QUIET;
+        [[fallthrough]];
 
-        case GOOD_QUIET :
-            if (Move move = select([&]() {
-                    if (cur->value > goodQuietThreshold)
-                        return true;
-                    *endBadMoves++ = *cur;
-                    return false;
-                }))
-                return move;
-        }
+    case GOOD_QUIET :
+        if (Move move = select([&]() {
+                if (cur->value > goodQuietThreshold)
+                    return true;
+                *endBadMoves++ = *cur;
+                return false;
+            }))
+            return move;
 
         // Prepare the pointers to loop over the bad captures
         cur    = moves;
-        endCur = endBadMoves;
+        endCur = skipQuiets ? endBadCaptures : endBadMoves;
 
         stage = BAD_MOVES;
         [[fallthrough]];
@@ -363,8 +360,8 @@ dispatch:
 
 void MovePicker::skip_quiet_moves() {
     skipQuiets = true;
-    if (stage == BAD_MOVES || stage == GOOD_QUIET)
-        endCur = endBadMoves = endBadCaptures;  // discards current-stage and bad quiet moves
+    if (stage == BAD_MOVES)
+        endCur = endBadCaptures;  // discards bad quiet moves
 }
 
 }  // namespace Stockfish
